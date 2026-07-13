@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.6.0-alpha] — 2026-07-13
+
+### Added
+
+- **Vision Query APIs** (`modules/vision/module.py`): MCP-exposable module introspection tools completing the PR3C vision module.
+  - `module_state()` — states of all loaded modules via registry (including `not_found` for unknown)
+  - `module_config()` — effective config dict for any module (including `not_found` for unknown)
+  - `system_info()` — PID, platform, Python version, uptime, memory RSS via `/proc/self/status`
+  - `get_tool_defs()` — 4 ToolDef entries: vision_state, vision_config, vision_logs, vision_system
+  - `_read_memory_rss()` — reads `VmRSS` from `/proc/self/status` with graceful `None` fallback
+  - Registry capture: `VisionModule.start()` now stores `context.registry` for module introspection (PR3C-A gap fix)
+  - 6 new tests: 5 degraded query modes + 1 Chronicle integration
+
+### Architecture
+
+- All query APIs degrade gracefully: no registry → empty dict, unknown module → `not_found` dict
+- `system_info()` uses stdlib only (`os`, `platform`, `time`, `/proc/self/status`) — zero external deps
+- `get_tool_defs()` imports `ToolDef` via lazy import — no eager adapter coupling
+
+---
+
 ## [0.5.0-alpha] — 2026-07-13
 
 ### Added

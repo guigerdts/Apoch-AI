@@ -158,10 +158,11 @@ with structured diagnostics capture. Implements spec subset: exception boundarie
 state tracking, post-failure diagnostics, graceful degradation. Timeouts and
 policy enforcement deferred to future releases.
 
-Vision ✅ `v0.5.0-alpha`
+Vision ✅ `v0.6.0-alpha`
 
-Observability for AI agents. Structured logging with NDJSON rotation, ring buffer,
-degraded mode support, and optional Chronicle integration via duck-typed services.
+Full observability suite: structured NDJSON logging with rotation, ring buffer, module
+state/config introspection, system info (PID, memory, platform), degraded mode support,
+and optional Chronicle integration via duck-typed services.
 
 Pulse ⏳
 
@@ -186,7 +187,7 @@ Development follows the approved roadmap. Current progress:
 | | — PR3A: Chronicle Foundation | ✅ `v0.3.0-alpha` |
 | | — PR3B: Guardian Module | ✅ `v0.4.0-alpha` |
 | | — PR3C-A: Vision Foundation | ✅ `v0.5.0-alpha` |
-| | — PR3C-B: Vision Query APIs | ⏳ Next |
+| | — PR3C-B: Vision Query APIs | ✅ `v0.6.0-alpha` |
 | | — Pulse, Optimizer, Oracle | ⏳ Pending |
 | Phase 4 | Ecosystem | ⏳ Pending |
 | Phase 5 | Stabilization | ⏳ Pending |

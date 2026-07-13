@@ -12,11 +12,14 @@ import time
 from collections import deque
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from apoch.core.module import Context, Module
 
-from .models import LogRecord
+from .models import LogRecord, SystemInfo
+
+if TYPE_CHECKING:
+    from apoch.core.registry import ModuleRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +56,7 @@ class VisionModule(Module):
         self._buffer: deque[LogRecord] = deque(maxlen=buffer_size)
         self._handler: logging.Handler | None = None
         self._event_sink: Callable | None = None
+        self._registry: ModuleRegistry | None = None
         self._started_at: float = 0.0
 
     # ------------------------------------------------------------------
@@ -70,6 +74,7 @@ class VisionModule(Module):
         warning is logged and Vision continues without file logging.
         """
         self._event_sink = context.services.get("chronicle.record")
+        self._registry = context.registry
         self._started_at = time.monotonic()
 
         # Attempt to set up the log directory and handler.
@@ -239,9 +244,140 @@ class VisionModule(Module):
             entries = [e for e in entries if e.level.upper() == level.upper()]
         return entries[:limit]
 
+    async def module_state(self, name: str | None = None) -> dict:
+        """Return current state for all modules, or a single module.
+
+        Args:
+            name: Optional module name.  ``None`` returns all states.
+
+        Returns:
+            Dict mapping name → ``state.value``.  Empty dict if no registry.
+        """
+        if self._registry is None:
+            return {}
+        modules = self._registry.loaded
+        if name is not None:
+            mod = modules.get(name)
+            if mod is None:
+                return {name: {"not_found": True}}
+            return {name: mod.state.value}
+        return {n: m.state.value for n, m in modules.items()}
+
+    async def module_config(self, name: str | None = None) -> dict:
+        """Return effective config for a module (via registry).
+
+        Args:
+            name: Optional module name.  ``None`` returns all configs.
+
+        Returns:
+            Dict mapping name → ``_config`` dict.  Empty dict if no registry.
+        """
+        if self._registry is None:
+            return {}
+        modules = self._registry.loaded
+        if name is not None:
+            mod = modules.get(name)
+            if mod is None:
+                return {name: {"not_found": True}}
+            return {name: mod._config}
+        return {n: m._config for n, m in modules.items()}
+
+    async def system_info(self) -> SystemInfo:
+        """Return process health snapshot.
+
+        Returns:
+            ``SystemInfo`` with PID, Python version, platform, uptime, and RSS.
+        """
+        import platform as _platform  # noqa: PLC0415
+
+        return SystemInfo(
+            python_version=_platform.python_version(),
+            platform=_platform.platform(),
+            pid=os.getpid(),
+            uptime_seconds=time.monotonic() - self._started_at,
+            memory_rss_mb=self._read_memory_rss(),
+        )
+
+    def get_tool_defs(self) -> list:
+        """Return MCP tool definitions for this module.
+
+        Returns:
+            List of 4 ``ToolDef`` entries (state, config, logs, system).
+        """
+        from apoch.adapters.base import ToolDef  # noqa: PLC0415
+
+        return [
+            ToolDef(
+                name="vision_state",
+                description="Return current states of loaded modules.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "module": {
+                            "type": "string",
+                            "description": "Optional module name. Omit for all.",
+                        },
+                    },
+                },
+            ),
+            ToolDef(
+                name="vision_config",
+                description="Return effective config for a module or all modules.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "module": {
+                            "type": "string",
+                            "description": "Optional module name. Omit for all.",
+                        },
+                    },
+                },
+            ),
+            ToolDef(
+                name="vision_logs",
+                description="Return recent structured log entries.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max entries (default 50).",
+                        },
+                        "level": {
+                            "type": "string",
+                            "description": "Severity filter (e.g. ERROR).",
+                        },
+                    },
+                },
+            ),
+            ToolDef(
+                name="vision_system",
+                description="Return process-level health and environment info.",
+                input_schema={"type": "object", "properties": {}},
+            ),
+        ]
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _read_memory_rss() -> float | None:
+        """Read RSS from ``/proc/self/status`` (Linux only).
+
+        Returns:
+            RSS in MB, or ``None`` on non-Linux.
+        """
+        try:
+            with open("/proc/self/status") as f:  # noqa: PTH123
+                for line in f:
+                    if line.startswith("VmRSS:"):
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            return round(int(parts[1]) / 1024, 1)
+        except (FileNotFoundError, OSError, ValueError, IndexError):
+            return None
+        return None
 
     @staticmethod
     def _level_for(level: str) -> int:
