@@ -39,6 +39,12 @@ class TestApochErrorHierarchy:
 
         assert issubclass(StorageError, ApochError)
 
+    def test_open_code_config_error_is_apoch_error(self):
+        """OpenCodeConfigError extends ApochError."""
+        from apoch.core.exceptions import ApochError, OpenCodeConfigError
+
+        assert issubclass(OpenCodeConfigError, ApochError)
+
 
 class TestExceptionBehavior:
     """Verify each exception can be raised, caught, and carries a message."""
@@ -81,3 +87,18 @@ class TestExceptionBehavior:
         with pytest.raises(StorageError) as exc_info:
             raise StorageError("Disk full")
         assert "Disk full" in str(exc_info.value)
+
+    def test_open_code_config_error_is_raiseable(self):
+        """OpenCodeConfigError can be raised with a message."""
+        from apoch.core.exceptions import OpenCodeConfigError
+
+        with pytest.raises(OpenCodeConfigError) as exc_info:
+            raise OpenCodeConfigError("Cannot read opencode.json")
+        assert "opencode.json" in str(exc_info.value)
+
+    def test_open_code_config_error_is_caught_as_apoch_error(self):
+        """OpenCodeConfigError is caught as ApochError."""
+        from apoch.core.exceptions import ApochError, OpenCodeConfigError
+
+        with pytest.raises(ApochError):
+            raise OpenCodeConfigError("test")

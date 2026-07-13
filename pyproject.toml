@@ -3,7 +3,12 @@ name = "apoch-ai"
 version = "0.1.0"
 description = "Agent-agnostic Python framework for AI-assisted development workflows"
 requires-python = ">=3.13"
-dependencies = ["pyyaml>=6.0", "typer>=0.15"]
+dependencies = [
+    "mcp>=1.28.1",
+    "pydantic>=2.13.4",
+    "pyyaml>=6.0",
+    "typer>=0.15",
+]
 
 [project.scripts]
 apoch = "apoch.cli.app:entry_point"
@@ -33,3 +38,11 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-anyio>=0.0.0",
+    "pytest-asyncio>=1.4.0",
+    "pytest-mock>=3.15.1",
+]

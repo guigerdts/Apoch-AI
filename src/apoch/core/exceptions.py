@@ -28,6 +28,10 @@ class ConfigError(ApochError):
     """Raised when the configuration cannot be loaded or parsed."""
 
 
+class OpenCodeConfigError(ApochError):
+    """Raised when opencode.json cannot be read, written, or validated."""
+
+
 class StorageError(ApochError):
     """Raised when a storage operation (read/write/delete) fails."""
 
@@ -38,5 +42,6 @@ __all__ = [
     "ModuleLoadError",
     "LifecycleError",
     "StateTransitionError",
+    "OpenCodeConfigError",
     "StorageError",
 ]
