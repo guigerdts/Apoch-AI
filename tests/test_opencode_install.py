@@ -10,11 +10,20 @@ from __future__ import annotations
 import json
 
 
+def _with_config(tmp_path, monkeypatch) -> None:
+    """Create an isolated opencode.json and chdir to tmp_path."""
+    opencode_path = tmp_path / ".opencode" / "opencode.json"
+    opencode_path.parent.mkdir(parents=True)
+    opencode_path.write_text("{}")
+    monkeypatch.chdir(tmp_path)
+
+
 class TestPrepareInstall:
     """OpenCodeAdapter.prepare_install() behavior."""
 
-    def test_prepare_install_returns_install_plan(self, tmp_path) -> None:
+    def test_prepare_install_returns_install_plan(self, tmp_path, monkeypatch) -> None:
         """prepare_install() returns an InstallPlan with backup + proposed."""
+        _with_config(tmp_path, monkeypatch)
         from apoch.adapters.opencode.server import OpenCodeAdapter
 
         adapter = OpenCodeAdapter(config={})
@@ -26,8 +35,9 @@ class TestPrepareInstall:
         assert "mcpServers" in plan.proposed
         assert "apoch" in plan.proposed["mcpServers"]
 
-    def test_prepare_install_creates_backup_file(self, tmp_path) -> None:
+    def test_prepare_install_creates_backup_file(self, tmp_path, monkeypatch) -> None:
         """prepare_install() writes a backup file on disk."""
+        _with_config(tmp_path, monkeypatch)
         from apoch.adapters.opencode.server import OpenCodeAdapter
 
         adapter = OpenCodeAdapter(config={})
