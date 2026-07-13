@@ -4,7 +4,7 @@ Enhancement framework for AI coding agents.
 Augments OpenCode and other agents with intelligent modules:
 memory, context management, code intelligence, observability, integrations.
 Stack: Python. Cross-platform. Developer-first.
-Estado: inicio desde cero.
+**Estado:** v0.4.0-alpha — Core + 2 módulos implementados (Chronicle, Guardian).
 
 
 # Apoch-AI
@@ -139,27 +139,35 @@ These are considered part of the platform.
 
 Apoch-AI introduces the following native modules.
 
-Chronicle
+Status: ✅ Implemented — 🔄 In progress — ⏳ Pending
 
-Activity recording and timeline generation.
+Chronicle ✅ `v0.3.0-alpha`
 
-Oracle
+Activity recording and timeline generation. SQLite-based event store with WAL,
+auto-prune, and dynamic filter queries. Implements spec subset: event recording,
+persistent storage, query interface, retention/pruning.
+
+Oracle ⏳
 
 Decision analysis and reasoning.
 
-Guardian
+Guardian ✅ `v0.4.0-alpha`
 
-Scope protection and execution boundaries.
+Exception isolation and execution boundaries. Wraps module lifecycle calls
+with structured diagnostics capture. Implements spec subset: exception boundaries,
+state tracking, post-failure diagnostics, graceful degradation. Timeouts and
+policy enforcement deferred to future releases.
 
-Vision
+Vision ⏳ (spec complete — pending PR3C)
 
-Observability for AI agents.
+Observability for AI agents. Structured logging, MCP tools (state, config, logs,
+system info), log rotation, Chronicle integration.
 
-Pulse
+Pulse ⏳
 
 Performance benchmarking.
 
-Optimizer
+Optimizer ⏳
 
 Context and token optimization.
 
@@ -167,19 +175,20 @@ Context and token optimization.
 
 # 10. Roadmap
 
-Development follows the approved roadmap.
+Development follows the approved roadmap. Current progress:
 
-Phase 0 — Foundation
-
-Phase 1 — Core
-
-Phase 2 — OpenCode Integration
-
-Phase 3 — Core Modules
-
-Phase 4 — Ecosystem
-
-Phase 5 — Stabilization
+| Phase | Description | Status |
+|-------|-------------|--------|
+| Phase 0 | Foundation (project setup, uv, CI, testing) | ✅ Complete |
+| Phase 1 | Core (Engine, Module, Registry, Events, Config, Exceptions) | ✅ Complete — `v0.1.0` |
+| Phase 2 | OpenCode Integration (Adapter, CLI, opencode.json manager) | ✅ Complete — `v0.2.0-alpha` |
+| Phase 3 | Core Modules | 🔄 In progress |
+| | — PR3A: Chronicle Foundation | ✅ `v0.3.0-alpha` |
+| | — PR3B: Guardian Module | ✅ `v0.4.0-alpha` |
+| | — PR3C: Vision Module | ⏳ Next |
+| | — Pulse, Optimizer, Oracle | ⏳ Pending |
+| Phase 4 | Ecosystem | ⏳ Pending |
+| Phase 5 | Stabilization | ⏳ Pending |
 
 The roadmap is considered frozen.
 

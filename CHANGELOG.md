@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.4.0-alpha] — 2026-07-13
+
+### Added
+
+- **Guardian Module** (`modules/guardian/`): Exception isolation boundary for module lifecycle. Wraps `start()`/`stop()`/`shutdown()` calls with structured error capture.
+  - `GuardianModule.protect()` with `CancelledError`/`KeyboardInterrupt` propagation
+  - `ModuleDiagnostics` frozen dataclass capturing error type, message, traceback, fail count, and timestamp
+  - Duck-typed integration into `ModuleRegistry` — Core remains import-free of `modules/`
+  - 25 tests: diagnostics, protect success/failure, lifecycle delegation, API edge cases
+
+### Architecture
+
+- Guardian does NOT protect itself (raw try/except for its own lifecycle)
+- Engine remains completely decoupled — zero references to any module name
+- No circular dependencies between modules (Chronicle ← Guardian: no cross-imports)
+- Core imports zero module code — only apoch.core.* and stdlib
+
+---
+
+## [0.3.0-alpha] — 2026-07-13
+
+### Added
+
+- **Chronicle Module** (`modules/chronicle/`): Activity recording and event timeline powered by SQLite with WAL mode.
+  - `SqliteEventStore` with schema migration support, dynamic filter queries (type, source, severity, time range), and configurable auto-prune
+  - `ActivityEvent`, `EventFilter`, `EventStats` data models with JSON serialization
+  - `ChronicleModule(Module)` with full lifecycle: connects DB on init, starts event loop, prunes on startup
+  - 35 tests (22 storage + 13 module), ~90% coverage
+  - Entry point registered, `user_data_dir()` detection via `_compat.py`
+
+---
+
 ## [0.2.0-alpha] — 2026-07-13
 
 ### Added
