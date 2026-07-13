@@ -127,7 +127,29 @@ class ModuleRegistry:
         wraps each non-Guardian lifecycle call with exception isolation.
         Guardian's own lifecycle uses a raw try/except (self-protection
         is impossible).
+
+        Before the lifecycle loop, gathers cross-module services from
+        all loaded modules via the duck-typed ``@property services``
+        attribute.  Service key collisions raise ``ModuleLoadError``
+        (fail-fast — never silent overwrite).
         """
+        # Gather cross-module services (generic, duck-typed)
+        for mod in self._loaded.values():
+            svc = getattr(mod, "services", None)
+            if isinstance(svc, dict):
+                for key in svc:
+                    if key in context.services:
+                        logger.critical(
+                            "Service key '%s' collision from %s",
+                            key,
+                            type(mod).__module__,
+                        )
+                        raise ModuleLoadError(
+                            f"Service key collision: '{key}' already registered. "
+                            f"Cannot register from {type(mod).__module__}."
+                        )
+                context.services.update(svc)
+
         for name in self._init_order:
             mod = self._loaded[name]
             use_guardian = (

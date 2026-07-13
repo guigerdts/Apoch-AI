@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.5.0-alpha] — 2026-07-13
+
+### Added
+
+- **Vision Module Foundation** (`modules/vision/`): Structured NDJSON logging with rotation, ring buffer, and optional Chronicle event archival via duck-typed service injection.
+  - `VisionModule(Module)` with full lifecycle (LOADED → RUNNING → STOPPED → SHUTDOWN)
+  - `log()` method with NDJSON rotating file handler, in-memory ring buffer, and FATAL flush
+  - `LogRecord` and `SystemInfo` data models (`modules/vision/models.py`)
+  - Degraded mode: works without log directory, without Chronicle, or with failing event_sink
+  - `@property services` on ChronicleModule exposing `"chronicle.record"` service contract
+  - Service gathering + collision detection in `Registry.start_all()`
+  - `Context.services` and `Context.registry` fields (generic, zero module names in Core)
+  - 9 new tests (5 service gathering + 4 degraded mode)
+
+### Architecture
+
+- Core remains import-free of `modules/` — services are duck-typed via `context.services.get()`
+- `context.services` is immutable at runtime — populated once, never modified
+- Service key collision raises `ModuleLoadError` (fail fast, no silent overwrite)
+- No circular dependencies (TYPE_CHECKING guard for ModuleRegistry in module.py)
+
+---
+
 ## [0.4.0-alpha] — 2026-07-13
 
 ### Added

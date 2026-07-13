@@ -16,6 +16,7 @@ apoch = "apoch.cli.app:entry_point"
 [project.entry-points."apoch.modules"]
 chronicle = "apoch.modules.chronicle.module:ChronicleModule"
 guardian = "apoch.modules.guardian.module:GuardianModule"
+vision = "apoch.modules.vision.module:VisionModule"
 
 [project.entry-points."apoch.plugins"]
 # Third-party plugins register here

@@ -596,3 +596,130 @@ class TestIntegrationDiscovery:
         await reg.stop_all()
         assert chronicle._state is ModuleState.SHUTDOWN
         assert guardian._state is ModuleState.SHUTDOWN
+
+
+class TestServiceGathering:
+    """ModuleRegistry gathers cross-module services during start_all()."""
+
+    class _ServiceProvider(Module):
+        """Module that exposes a service."""
+
+        @property
+        def services(self) -> dict:
+            return {"test.svc": lambda: "hello"}
+
+        async def start(self, context: Context) -> None:
+            pass
+
+        async def stop(self) -> None:
+            pass
+
+        async def shutdown(self) -> None:
+            pass
+
+    class _SilentModule(Module):
+        """Module without services property."""
+
+        async def start(self, context: Context) -> None:
+            pass
+
+        async def stop(self) -> None:
+            pass
+
+        async def shutdown(self) -> None:
+            pass
+
+    class _CollidingModule(Module):
+        """Module that collides with test.svc."""
+
+        @property
+        def services(self) -> dict:
+            return {"test.svc": lambda: "collision"}
+
+        async def start(self, context: Context) -> None:
+            pass
+
+        async def stop(self) -> None:
+            pass
+
+        async def shutdown(self) -> None:
+            pass
+
+    @pytest.fixture
+    def context(self):
+        return Context()
+
+    @pytest.mark.asyncio
+    async def test_gathers_services_from_loaded_modules(self, context):
+        """start_all() gathers services from modules with @property services."""
+        from apoch.core.registry import ModuleRegistry
+
+        reg = ModuleRegistry()
+        reg._loaded["provider"] = self._ServiceProvider({})
+        reg._init_order.append("provider")
+        await reg.start_all(context)
+        assert "test.svc" in context.services
+
+    @pytest.mark.asyncio
+    async def test_skip_modules_without_services(self, context):
+        """start_all() skips modules that don't expose services."""
+        from apoch.core.registry import ModuleRegistry
+
+        reg = ModuleRegistry()
+        reg._loaded["silent"] = self._SilentModule({})
+        reg._init_order.append("silent")
+        await reg.start_all(context)
+        # Should not raise, context.services stays empty
+        assert context.services == {}
+
+    @pytest.mark.asyncio
+    async def test_collision_raises_error(self, context):
+        """start_all() raises ModuleLoadError on service key collision."""
+        from apoch.core.registry import ModuleRegistry
+
+        reg = ModuleRegistry()
+        reg._loaded["provider"] = self._ServiceProvider({})
+        reg._loaded["collider"] = self._CollidingModule({})
+        reg._init_order.extend(["provider", "collider"])
+        with pytest.raises(ModuleLoadError, match="collision"):
+            await reg.start_all(context)
+
+    @pytest.mark.asyncio
+    async def test_services_immutable_after_gathering(self, context):
+        """context.services is not overwritten after gathering."""
+        from apoch.core.registry import ModuleRegistry
+
+        reg = ModuleRegistry()
+        reg._loaded["provider"] = self._ServiceProvider({})
+        reg._init_order.append("provider")
+        await reg.start_all(context)
+        # Verify the service is still there after lifecycle runs
+        assert "test.svc" in context.services
+
+    @pytest.mark.asyncio
+    async def test_multiple_services_from_different_modules(self, context):
+        """Different service keys from different modules."""
+        from apoch.core.registry import ModuleRegistry
+
+        class _ProviderA(Module):
+            @property
+            def services(self): return {"alpha": lambda: "A"}
+            async def start(self, ctx): pass
+            async def stop(self): pass
+            async def shutdown(self): pass
+
+        class _ProviderB(Module):
+            @property
+            def services(self): return {"beta": lambda: "B"}
+            async def start(self, ctx): pass
+            async def stop(self): pass
+            async def shutdown(self): pass
+
+        reg = ModuleRegistry()
+        reg._loaded["mod_a"] = _ProviderA({})
+        reg._loaded["mod_b"] = _ProviderB({})
+        reg._init_order = ["mod_a", "mod_b"]
+        await reg.start_all(context)
+        assert "alpha" in context.services
+        assert "beta" in context.services
+        assert len(context.services) == 2

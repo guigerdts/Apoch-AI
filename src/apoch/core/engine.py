@@ -88,6 +88,7 @@ class Engine:
 
         # Start all loaded modules.
         self._context = Context()
+        self._context.registry = self._registry
         await self._registry.start_all(self._context)
         logger.info("Engine started — %d module(s) running", len(loaded_names))
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -121,6 +122,21 @@ class ChronicleModule(Module):
     async def stats(self) -> EventStats:
         """Return aggregate statistics over all recorded events."""
         return self._store.stats()
+
+    # ------------------------------------------------------------------
+    # Cross-module services
+    # ------------------------------------------------------------------
+
+    @property
+    def services(self) -> dict[str, Callable]:
+        """Publish the event-recording API as a cross-module service.
+
+        Published contract:
+            key:       ``"chronicle.record"``
+            signature: ``async (event: ActivityEvent) -> None``
+            optional:  Yes — consumer modules degrade gracefully.
+        """
+        return {"chronicle.record": self.record}
 
     # ------------------------------------------------------------------
     # Internal helpers

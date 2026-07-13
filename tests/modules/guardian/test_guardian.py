@@ -15,7 +15,6 @@ from apoch.core.module import Context, Module, ModuleState
 from apoch.modules.guardian.diagnostics import ModuleDiagnostics
 from apoch.modules.guardian.module import GuardianModule
 
-
 # =======================================================================
 # Fixtures
 # =======================================================================

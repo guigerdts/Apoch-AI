@@ -4,7 +4,7 @@ Enhancement framework for AI coding agents.
 Augments OpenCode and other agents with intelligent modules:
 memory, context management, code intelligence, observability, integrations.
 Stack: Python. Cross-platform. Developer-first.
-**Estado:** v0.4.0-alpha — Core + 2 módulos implementados (Chronicle, Guardian).
+**Estado:** v0.5.0-alpha — Core + 3 módulos implementados (Chronicle, Guardian, Vision).
 
 
 # Apoch-AI
@@ -158,10 +158,10 @@ with structured diagnostics capture. Implements spec subset: exception boundarie
 state tracking, post-failure diagnostics, graceful degradation. Timeouts and
 policy enforcement deferred to future releases.
 
-Vision ⏳ (spec complete — pending PR3C)
+Vision ✅ `v0.5.0-alpha`
 
-Observability for AI agents. Structured logging, MCP tools (state, config, logs,
-system info), log rotation, Chronicle integration.
+Observability for AI agents. Structured logging with NDJSON rotation, ring buffer,
+degraded mode support, and optional Chronicle integration via duck-typed services.
 
 Pulse ⏳
 
@@ -185,7 +185,8 @@ Development follows the approved roadmap. Current progress:
 | Phase 3 | Core Modules | 🔄 In progress |
 | | — PR3A: Chronicle Foundation | ✅ `v0.3.0-alpha` |
 | | — PR3B: Guardian Module | ✅ `v0.4.0-alpha` |
-| | — PR3C: Vision Module | ⏳ Next |
+| | — PR3C-A: Vision Foundation | ✅ `v0.5.0-alpha` |
+| | — PR3C-B: Vision Query APIs | ⏳ Next |
 | | — Pulse, Optimizer, Oracle | ⏳ Pending |
 | Phase 4 | Ecosystem | ⏳ Pending |
 | Phase 5 | Stabilization | ⏳ Pending |

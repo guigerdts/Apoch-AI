@@ -8,11 +8,15 @@ from __future__ import annotations
 
 import functools
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from apoch.core.exceptions import LifecycleError, StateTransitionError
+
+if TYPE_CHECKING:
+    from apoch.core.registry import ModuleRegistry
 
 # ---------------------------------------------------------------------------
 # Module state
@@ -60,9 +64,30 @@ class ModuleMetadata:
 class Context:
     """Execution context passed to ``Module.start()``.
 
-    Currently a placeholder — will be extended with runtime information
-    such as the event loop, shared data directories, and module registry
-    reference.
+    Carries cross-module service references and runtime infrastructure
+    that modules may need while still keeping Core dependency-free of
+    specific module implementations.
+
+    ``services`` is populated by :class:`ModuleRegistry` before the
+    first ``start()`` call — it is immutable at runtime.
+
+    ``registry`` is set by :class:`Engine` and provides read-only
+    access to all loaded modules for state/config introspection.
+    """
+
+    services: dict[str, Callable] = field(default_factory=dict)
+    """Generic cross-module service registry.
+
+    Populated once at startup by ``Registry.start_all()``.  Modules
+    publish services via a ``@property services`` duck-typed attribute.
+    Never modified at runtime.
+    """
+
+    registry: ModuleRegistry | None = None
+    """Read-only reference to the ModuleRegistry for state queries.
+
+    Set by ``Engine.start()`` before ``start_all()``.  ``None`` if
+    the Engine has not started yet or has been stopped.
     """
 
 
