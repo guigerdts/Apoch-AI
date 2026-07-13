@@ -1,0 +1,73 @@
+# openspec/config.yaml
+schema: spec-driven
+
+context: |
+  Tech stack: Python 3.13, uv 0.11.19
+  Architecture: Modular, CLI/TUI Python package, agent-agnostic
+  Testing: pytest 9.1.1, pytest-asyncio, pytest-cov, pytest-mock, ruff
+  Style: Clean architecture, event-driven, cross-platform
+  Target: OpenCode v1, with future multi-agent support
+
+strict_tdd: true
+
+testing:
+  runner:
+    command: pytest
+    framework: pytest
+    version: 9.1.1
+  layers:
+    unit:
+      available: true
+      tool: pytest
+    integration:
+      available: true
+      tool: pytest + httpx (planned)
+    e2e:
+      available: false
+      tool: null
+  coverage:
+    available: true
+    command: pytest --cov
+    tool: pytest-cov 7.1.0
+    threshold: 80
+  quality:
+    linter:
+      available: true
+      command: ruff check
+      tool: ruff 0.15.20
+    type_checker:
+      available: false
+      command: null
+      tool: null
+    formatter:
+      available: true
+      command: ruff format
+      tool: ruff 0.15.20
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Must align with project philosophy (enhance, not replace)
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+    - Never duplicate OpenCode functionality
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+    - Agent agnostic core, OpenCode-specific integrations
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    guidelines:
+      - Follow existing code patterns
+      - Core must never depend on modules
+    tdd: true
+    test_command: pytest
+  verify:
+    test_command: pytest
+    build_command: uv build
+    coverage_threshold: 80
+  archive:
+    - Warn before merging destructive deltas

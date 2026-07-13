@@ -1,0 +1,25 @@
+# Local Pi runtime state
+.atl/
+
+# Python caching & bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build & packaging
+build/
+dist/
+*.egg-info/
+src/*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Development tools & caches
+.pytest_cache/
+.ruff_cache/
+.codegraph/
+.gga
