@@ -242,9 +242,7 @@ class TestLifecycle:
         assert module._state is ModuleState.SHUTDOWN
 
     @pytest.mark.asyncio
-    async def test_double_start_raises_state_transition_error(
-        self, module, context
-    ):
+    async def test_double_start_raises_state_transition_error(self, module, context):
         """Starting an already-running module raises StateTransitionError."""
         from apoch.core.exceptions import StateTransitionError
 
@@ -269,9 +267,7 @@ class TestLifecycle:
             await module.shutdown()
 
     @pytest.mark.asyncio
-    async def test_shutdown_without_stop_raises_lifecycle_error(
-        self, module, context
-    ):
+    async def test_shutdown_without_stop_raises_lifecycle_error(self, module, context):
         """Shutting down from RUNNING without stop raises LifecycleError."""
         from apoch.core.exceptions import LifecycleError
 
@@ -280,9 +276,7 @@ class TestLifecycle:
             await module.shutdown()
 
     @pytest.mark.asyncio
-    async def test_stop_after_shutdown_raises_lifecycle_error(
-        self, module, context
-    ):
+    async def test_stop_after_shutdown_raises_lifecycle_error(self, module, context):
         """Stopping a shut-down module raises LifecycleError."""
         from apoch.core.exceptions import LifecycleError
 
@@ -293,9 +287,7 @@ class TestLifecycle:
             await module.stop()
 
     @pytest.mark.asyncio
-    async def test_start_after_shutdown_raises_lifecycle_error(
-        self, module, context
-    ):
+    async def test_start_after_shutdown_raises_lifecycle_error(self, module, context):
         """Starting a shut-down module raises LifecycleError."""
         from apoch.core.exceptions import LifecycleError
 

@@ -33,9 +33,7 @@ IS_WSL = "microsoft" in (platform.uname().release.lower() if hasattr(platform, "
 
 # Signals available on most POSIX platforms
 _SIGNAMES: dict[int, str] = {
-    getattr(signal, n): n
-    for n in dir(signal)
-    if n.startswith("SIG") and not n.startswith("SIG_")
+    getattr(signal, n): n for n in dir(signal) if n.startswith("SIG") and not n.startswith("SIG_")
 }
 
 _HANDLERS: dict[int, Callable[[int, object], None]] = {}
@@ -64,8 +62,7 @@ def set_signal_handler(
     except (ValueError, OSError) as exc:
         if strict:
             raise RuntimeError(
-                f"Cannot set handler for signal {signum} "
-                f"({_SIGNAMES.get(signum, '?')}): {exc}"
+                f"Cannot set handler for signal {signum} ({_SIGNAMES.get(signum, '?')}): {exc}"
             ) from exc
 
 

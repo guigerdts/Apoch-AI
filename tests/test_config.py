@@ -13,10 +13,11 @@ class TestConfigError:
     """ConfigError is defined in the config package (not core.exceptions)."""
 
     def test_config_error_exists(self):
-        """ConfigError extends Exception."""
+        """ConfigError extends ApochError."""
         from apoch.config import ConfigError
+        from apoch.core.exceptions import ApochError
 
-        assert issubclass(ConfigError, Exception)
+        assert issubclass(ConfigError, ApochError)
 
     def test_config_error_is_raiseable(self):
         """ConfigError can be raised with a message."""

@@ -16,6 +16,7 @@ from apoch.core.module import Context, Module, ModuleMetadata, ModuleState
 # Test helpers
 # ---------------------------------------------------------------------------
 
+
 class _TestModule(Module):
     """A minimal concrete Module subclass for registry tests."""
 
@@ -291,25 +292,30 @@ class TestLoad:
 
             async def start(self, context):
                 pass
+
             async def stop(self):
                 pass
+
             async def shutdown(self):
                 pass
 
         eps = [
             _make_mock_ep(
-                "test_mod", "tests.test_registry:_ConfigCheckModule",
+                "test_mod",
+                "tests.test_registry:_ConfigCheckModule",
                 module_class=_ConfigCheckModule,
             ),
         ]
         mock_eps.return_value = eps
         from apoch.core.registry import ModuleRegistry
 
-        reg = ModuleRegistry({
-            "modules": {
-                "test_mod": {"log_level": "debug"},
-            },
-        })
+        reg = ModuleRegistry(
+            {
+                "modules": {
+                    "test_mod": {"log_level": "debug"},
+                },
+            }
+        )
         reg.load("test_mod")
         assert len(ep_calls) == 1
         assert ep_calls[0] == {"log_level": "debug"}
@@ -327,14 +333,17 @@ class TestLoad:
 
             async def start(self, context):
                 pass
+
             async def stop(self):
                 pass
+
             async def shutdown(self):
                 pass
 
         eps = [
             _make_mock_ep(
-                "test_mod", "tests.test_registry:_EmptyConfigModule",
+                "test_mod",
+                "tests.test_registry:_EmptyConfigModule",
                 module_class=_EmptyConfigModule,
             ),
         ]
@@ -377,11 +386,13 @@ class TestStartAll:
         """start_all() does not stop on a failing module."""
         eps = [
             _make_mock_ep(
-                "failing", "tests.test_registry:_FailingModule",
+                "failing",
+                "tests.test_registry:_FailingModule",
                 module_class=_FailingModule,
             ),
             _make_mock_ep(
-                "ok", "tests.test_registry:_TestModule",
+                "ok",
+                "tests.test_registry:_TestModule",
                 module_class=_TestModule,
             ),
         ]
@@ -428,16 +439,22 @@ class TestStopAll:
         shutdown_order = []
 
         class _OrderModuleA(Module):
-            async def start(self, context): pass
+            async def start(self, context):
+                pass
+
             async def stop(self):
                 stop_order.append("A")
+
             async def shutdown(self):
                 shutdown_order.append("A")
 
         class _OrderModuleB(Module):
-            async def start(self, context): pass
+            async def start(self, context):
+                pass
+
             async def stop(self):
                 stop_order.append("B")
+
             async def shutdown(self):
                 shutdown_order.append("B")
 
@@ -463,21 +480,26 @@ class TestStopAll:
         """stop_all() continues even if a module's stop() or shutdown() fails."""
 
         class _StopFailModule(Module):
-            async def start(self, context): pass
+            async def start(self, context):
+                pass
+
             async def stop(self):
                 msg = "stop failed"
                 raise RuntimeError(msg)
+
             async def shutdown(self):
                 msg = "shutdown failed"
                 raise RuntimeError(msg)
 
         eps = [
             _make_mock_ep(
-                "failing", "tests.test_registry:_StopFailModule",
+                "failing",
+                "tests.test_registry:_StopFailModule",
                 module_class=_StopFailModule,
             ),
             _make_mock_ep(
-                "ok", "tests.test_registry:_TestModule",
+                "ok",
+                "tests.test_registry:_TestModule",
                 module_class=_TestModule,
             ),
         ]
@@ -535,12 +557,20 @@ class TestIntegrationDiscovery:
     async def test_discover_load_start_stop_cycle(self, mock_eps, context):
         """Full lifecycle round-trip with discover, load, start, stop."""
         eps = [
-            _make_mock_ep("chronicle", "apoch.modules.chronicle.module:ChronicleModule",
-                          version="0.1.0", description="Activity recording",
-                          module_class=_TestModule),
-            _make_mock_ep("guardian", "apoch.modules.guardian.module:GuardianModule",
-                          version="0.2.0", description="Exception boundaries",
-                          module_class=_TestModule),
+            _make_mock_ep(
+                "chronicle",
+                "apoch.modules.chronicle.module:ChronicleModule",
+                version="0.1.0",
+                description="Activity recording",
+                module_class=_TestModule,
+            ),
+            _make_mock_ep(
+                "guardian",
+                "apoch.modules.guardian.module:GuardianModule",
+                version="0.2.0",
+                description="Exception boundaries",
+                module_class=_TestModule,
+            ),
         ]
         mock_eps.return_value = eps
         from apoch.core.registry import ModuleRegistry

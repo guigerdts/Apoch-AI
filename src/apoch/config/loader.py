@@ -9,10 +9,6 @@ precedence:
 
 Spec: module-system §Config Override
 Design: Config Format (YAML primary + env var overrides)
-
-**Import contract**
-This module is a **leaf package** — it must NOT import from ``apoch.core.*``,
-``apoch.cli.*``, ``apoch.modules.*``, or any other Apoch-AI internal package.
 """
 
 from __future__ import annotations
@@ -24,20 +20,13 @@ from pathlib import Path
 import yaml
 
 from apoch.config.defaults import ENV_KEY_MAP, KNOWN_KEYS, fresh_defaults
-
-
-class ConfigError(Exception):
-    """Raised when the configuration cannot be loaded or parsed."""
+from apoch.core.exceptions import ConfigError
 
 
 def _deep_merge(base: dict, overlay: dict) -> dict:
     """Deep-merge *overlay* into *base*, mutating and returning *base*."""
     for key, value in overlay.items():
-        if (
-            key in base
-            and isinstance(base[key], dict)
-            and isinstance(value, dict)
-        ):
+        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
             _deep_merge(base[key], value)
         else:
             base[key] = value
@@ -60,9 +49,7 @@ class ConfigLoader:
     """
 
     def __init__(self, config_path: str | Path | None = None) -> None:
-        self._explicit_path: Path | None = (
-            Path(config_path).resolve() if config_path else None
-        )
+        self._explicit_path: Path | None = Path(config_path).resolve() if config_path else None
 
     def load(self) -> dict:
         """Load, merge, and return the effective configuration dict.
@@ -80,16 +67,12 @@ class ConfigLoader:
                 raw = path.read_text(encoding="utf-8")
                 yaml_config: dict = yaml.safe_load(raw) or {}
             except yaml.YAMLError as exc:
-                raise ConfigError(
-                    f"Malformed YAML config at {path}: {exc}"
-                ) from exc
+                raise ConfigError(f"Malformed YAML config at {path}: {exc}") from exc
 
             # Warn about unknown keys
             for key in yaml_config:
                 if key not in KNOWN_KEYS:
-                    warnings.warn(
-                        f"Unknown config key '{key}' in {path}", stacklevel=2
-                    )
+                    warnings.warn(f"Unknown config key '{key}' in {path}", stacklevel=2)
 
             config = _deep_merge(config, yaml_config)
 

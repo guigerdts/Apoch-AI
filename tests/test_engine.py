@@ -21,23 +21,30 @@ from apoch.core.registry import ModuleRegistry
 # Test helpers
 # ---------------------------------------------------------------------------
 
+
 class _GoodModule(Module):
     """Module that succeeds in all lifecycle methods."""
+
     async def start(self, context: Context) -> None:
         pass
+
     async def stop(self) -> None:
         pass
+
     async def shutdown(self) -> None:
         pass
 
 
 class _FailingStartModule(Module):
     """Module that fails during start()."""
+
     async def start(self, context: Context) -> None:
         msg = "start failed"
         raise RuntimeError(msg)
+
     async def stop(self) -> None:
         pass
+
     async def shutdown(self) -> None:
         pass
 
@@ -104,8 +111,12 @@ class TestEngineStart:
     async def test_start_discover_and_load_modules(self, mock_eps, context):
         """Engine.start() discovers and loads modules."""
         eps = [
-            MagicMock(name="chronicle", value="apoch.modules.chronicle.module:ChronicleModule",
-                      group="apoch.modules", spec=["name", "value", "group", "load", "dist"]),
+            MagicMock(
+                name="chronicle",
+                value="apoch.modules.chronicle.module:ChronicleModule",
+                group="apoch.modules",
+                spec=["name", "value", "group", "load", "dist"],
+            ),
         ]
         eps[0].name = "chronicle"
         eps[0].value = "apoch.modules.chronicle.module:ChronicleModule"
@@ -126,8 +137,12 @@ class TestEngineStart:
     async def test_start_calls_registry_start_all(self, mock_eps, context):
         """Engine.start() calls registry.start_all()."""
         eps = [
-            MagicMock(name="chronicle", value="apoch.modules.chronicle.module:ChronicleModule",
-                      group="apoch.modules", spec=["name", "value", "group", "load", "dist"]),
+            MagicMock(
+                name="chronicle",
+                value="apoch.modules.chronicle.module:ChronicleModule",
+                group="apoch.modules",
+                spec=["name", "value", "group", "load", "dist"],
+            ),
         ]
         eps[0].name = "chronicle"
         eps[0].value = "apoch.modules.chronicle.module:ChronicleModule"
@@ -149,8 +164,12 @@ class TestEngineStart:
     async def test_start_skips_disabled_modules(self, mock_eps, context):
         """Engine.start() skips modules disabled in config."""
         eps = [
-            MagicMock(name="chronicle", value="apoch.modules.chronicle.module:ChronicleModule",
-                      group="apoch.modules", spec=["name", "value", "group", "load", "dist"]),
+            MagicMock(
+                name="chronicle",
+                value="apoch.modules.chronicle.module:ChronicleModule",
+                group="apoch.modules",
+                spec=["name", "value", "group", "load", "dist"],
+            ),
         ]
         eps[0].name = "chronicle"
         eps[0].value = "apoch.modules.chronicle.module:ChronicleModule"
@@ -209,8 +228,12 @@ class TestEngineStop:
     async def test_stop_shuts_down_modules(self, mock_eps):
         """Engine.stop() calls registry.stop_all()."""
         eps = [
-            MagicMock(name="chronicle", value="apoch.modules.chronicle.module:ChronicleModule",
-                      group="apoch.modules", spec=["name", "value", "group", "load", "dist"]),
+            MagicMock(
+                name="chronicle",
+                value="apoch.modules.chronicle.module:ChronicleModule",
+                group="apoch.modules",
+                spec=["name", "value", "group", "load", "dist"],
+            ),
         ]
         eps[0].name = "chronicle"
         eps[0].value = "apoch.modules.chronicle.module:ChronicleModule"
@@ -273,8 +296,12 @@ class TestEngineStartStop:
     async def test_full_start_stop_lifecycle(self, mock_eps):
         """Full start→stop cycle completes successfully."""
         eps = [
-            MagicMock(name="chronicle", value="apoch.modules.chronicle.module:ChronicleModule",
-                      group="apoch.modules", spec=["name", "value", "group", "load", "dist"]),
+            MagicMock(
+                name="chronicle",
+                value="apoch.modules.chronicle.module:ChronicleModule",
+                group="apoch.modules",
+                spec=["name", "value", "group", "load", "dist"],
+            ),
         ]
         eps[0].name = "chronicle"
         eps[0].value = "apoch.modules.chronicle.module:ChronicleModule"
@@ -297,10 +324,18 @@ class TestEngineStartStop:
     async def test_only_loaded_modules_are_started(self, mock_eps):
         """Only modules that were loaded via load() are started."""
         eps = [
-            MagicMock(name="mod_a", value="tests.test_engine:_GoodModule",
-                      group="apoch.modules", spec=["name", "value", "group", "load", "dist"]),
-            MagicMock(name="mod_b", value="tests.test_engine:_GoodModule",
-                      group="apoch.modules", spec=["name", "value", "group", "load", "dist"]),
+            MagicMock(
+                name="mod_a",
+                value="tests.test_engine:_GoodModule",
+                group="apoch.modules",
+                spec=["name", "value", "group", "load", "dist"],
+            ),
+            MagicMock(
+                name="mod_b",
+                value="tests.test_engine:_GoodModule",
+                group="apoch.modules",
+                spec=["name", "value", "group", "load", "dist"],
+            ),
         ]
         eps[0].name = "mod_a"
         eps[0].value = "tests.test_engine:_GoodModule"
@@ -331,10 +366,18 @@ class TestEngineStartStop:
     async def test_start_stop_multiple_modules(self, mock_eps):
         """Multiple modules start and stop correctly."""
         eps = [
-            MagicMock(name="mod_a", value="tests.test_engine:_GoodModule",
-                      group="apoch.modules", spec=["name", "value", "group", "load", "dist"]),
-            MagicMock(name="mod_b", value="tests.test_engine:_GoodModule",
-                      group="apoch.modules", spec=["name", "value", "group", "load", "dist"]),
+            MagicMock(
+                name="mod_a",
+                value="tests.test_engine:_GoodModule",
+                group="apoch.modules",
+                spec=["name", "value", "group", "load", "dist"],
+            ),
+            MagicMock(
+                name="mod_b",
+                value="tests.test_engine:_GoodModule",
+                group="apoch.modules",
+                spec=["name", "value", "group", "load", "dist"],
+            ),
         ]
         eps[0].name = "mod_a"
         eps[0].value = "tests.test_engine:_GoodModule"

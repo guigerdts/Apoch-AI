@@ -22,9 +22,7 @@ def list_cmd(
     verbose: bool = typer.Option(
         False, "--verbose", help="Show detailed module info (entry point, description)."
     ),
-    fmt: str = typer.Option(
-        "text", "--format", help="Output format: text or json."
-    ),
+    fmt: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
     """List all discovered modules and their states.
 
@@ -38,7 +36,7 @@ def list_cmd(
     rows: list[dict] = []
     for meta in discovered:
         mod = loaded.get(meta.name)
-        status: str = mod.state.value if mod else "unknown"
+        status: str = mod.state.value if mod else "unknown"  # type: ignore[attr-defined]
 
         row: dict = {
             "name": meta.name,

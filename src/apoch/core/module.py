@@ -195,17 +195,13 @@ class Module(ABC, _StateMachine):
     def _pre_stop(self) -> None:
         """Validate pre-conditions before running the subclass ``stop()``."""
         if self._state != ModuleState.RUNNING:
-            raise LifecycleError(
-                f"Cannot stop module from state {self._state.value}"
-            )
+            raise LifecycleError(f"Cannot stop module from state {self._state.value}")
         self._transition(ModuleState.STOPPED)
 
     def _pre_shutdown(self) -> None:
         """Validate pre-conditions before running the subclass ``shutdown()``."""
         if self._state != ModuleState.STOPPED:
-            raise LifecycleError(
-                f"Cannot shut down module from state {self._state.value}"
-            )
+            raise LifecycleError(f"Cannot shut down module from state {self._state.value}")
         self._transition(ModuleState.SHUTDOWN)
 
     # ------------------------------------------------------------------
@@ -224,6 +220,11 @@ class Module(ABC, _StateMachine):
             )
         _StateMachine.__init__(self)
         self._config: dict = config
+
+    @property
+    def state(self) -> ModuleState:
+        """Current lifecycle state of this module."""
+        return self._state
 
     @abstractmethod
     async def start(self, context: Context) -> None:

@@ -80,17 +80,13 @@ class ModuleRegistry:
                 break
 
         if target is None:
-            raise ModuleLoadError(
-                f"Module '{name}' not found in apoch.modules entry points"
-            )
+            raise ModuleLoadError(f"Module '{name}' not found in apoch.modules entry points")
 
         # Load the entry point class
         try:
             module_class = target.load()
         except Exception as exc:
-            raise ModuleLoadError(
-                f"Failed to load entry point for module '{name}': {exc}"
-            ) from exc
+            raise ModuleLoadError(f"Failed to load entry point for module '{name}': {exc}") from exc
 
         # Build module-specific config
         modules_config = self._config.get("modules", {})
@@ -99,9 +95,7 @@ class ModuleRegistry:
         try:
             instance: Module = module_class(config=module_config)
         except Exception as exc:
-            raise ModuleLoadError(
-                f"Failed to instantiate module '{name}': {exc}"
-            ) from exc
+            raise ModuleLoadError(f"Failed to instantiate module '{name}': {exc}") from exc
 
         self._loaded[name] = instance
         self._init_order.append(name)
@@ -122,9 +116,7 @@ class ModuleRegistry:
             try:
                 await mod.start(context)
             except Exception as exc:
-                logger.exception(
-                    "Module '%s' failed during start(): %s", name, exc
-                )
+                logger.exception("Module '%s' failed during start(): %s", name, exc)
                 mod._state = ModuleState.FAILED  # type: ignore[attr-defined]
 
     async def stop_all(self) -> None:
@@ -138,15 +130,11 @@ class ModuleRegistry:
             try:
                 await mod.stop()
             except Exception as exc:
-                logger.exception(
-                    "Module '%s' failed during stop(): %s", name, exc
-                )
+                logger.exception("Module '%s' failed during stop(): %s", name, exc)
             try:
                 await mod.shutdown()
             except Exception as exc:
-                logger.exception(
-                    "Module '%s' failed during shutdown(): %s", name, exc
-                )
+                logger.exception("Module '%s' failed during shutdown(): %s", name, exc)
 
     # ------------------------------------------------------------------
     # Read-only accessors

@@ -8,6 +8,7 @@ import sys
 
 
 def _print_help() -> None:
+    """Print usage information to stdout."""
     help_text = (
         "Usage: apoch [OPTIONS] COMMAND [ARGS]...\n"
         "\n"
@@ -30,6 +31,7 @@ def _print_help() -> None:
 
 
 def main() -> None:
+    """Parse CLI args and dispatch — standalone entry point for ``python -m apoch``."""
     args = sys.argv[1:]
     if not args or args[0] in ("--help", "-h"):
         _print_help()
@@ -41,10 +43,7 @@ def main() -> None:
         sys.exit(0)
     else:
         _print_help()
-        sys.stdout.write(
-            f"\nError: No such command '{args[0]}'.\n"
-            f"Run 'apoch --help' for usage.\n"
-        )
+        sys.stdout.write(f"\nError: No such command '{args[0]}'.\nRun 'apoch --help' for usage.\n")
         sys.exit(2)
 
 

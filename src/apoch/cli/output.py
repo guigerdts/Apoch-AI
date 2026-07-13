@@ -38,9 +38,7 @@ def _format_text(data: Any, verbose: bool = False) -> str:
     if isinstance(data, list):
         return _format_list(data, verbose=verbose)
     if isinstance(data, dict):
-        return "\n".join(
-            f"  {k}: {v}" for k, v in data.items()
-        )
+        return "\n".join(f"  {k}: {v}" for k, v in data.items())
     return str(data)
 
 

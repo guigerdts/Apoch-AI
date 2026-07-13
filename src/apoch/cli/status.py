@@ -20,9 +20,7 @@ cli_app = typer.Typer()
 
 @cli_app.callback(invoke_without_command=True)
 def status_cmd(
-    fmt: str = typer.Option(
-        "text", "--format", help="Output format: text or json."
-    ),
+    fmt: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
     """Show system health and module status.
 

@@ -29,11 +29,13 @@ class TestAppImports:
     def test_app_exposes_typer_instance(self) -> None:
         """RED: apoch.cli.app exposes a typer.Typer app."""
         from apoch.cli.app import app  # noqa: F811 — ImportError expected
+
         assert app is not None
 
     def test_list_module_importable(self) -> None:
         """RED: apoch.cli.list module is importable."""
         from apoch.cli.list import cli_app  # noqa: F811 — ImportError expected
+
         assert cli_app is not None
 
     def test_status_module_importable(self) -> None:
@@ -41,6 +43,7 @@ class TestAppImports:
         from apoch.cli.status import (  # noqa: F811 — ImportError expected
             cli_app,
         )
+
         assert cli_app is not None
 
     def test_output_format_importable(self) -> None:
@@ -48,6 +51,7 @@ class TestAppImports:
         from apoch.cli.output import (  # noqa: F811 — ImportError expected
             format_output,
         )
+
         assert callable(format_output)
 
 
@@ -211,8 +215,6 @@ class TestListCommand:
         # Mock ModuleRegistry.loaded so running_mod shows as RUNNING
         from apoch.core.registry import ModuleRegistry
 
-
-
         def patched_load(self, name: str) -> Module:
             mod = mocker.Mock(spec=Module)
             mod.state = ModuleState.RUNNING
@@ -282,9 +284,7 @@ class TestStatusCommand:
 
         runner = CliRunner()
         result = runner.invoke(app, ["status"])
-        assert "1" in result.stdout, (
-            f"Expected module count in status output, got: {result.stdout}"
-        )
+        assert "1" in result.stdout, f"Expected module count in status output, got: {result.stdout}"
 
     def test_status_json_format(self, mocker) -> None:
         """apoch status --format json returns parseable JSON."""

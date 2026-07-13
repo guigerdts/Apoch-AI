@@ -6,7 +6,7 @@ requires-python = ">=3.13"
 dependencies = ["pyyaml>=6.0", "typer>=0.15"]
 
 [project.scripts]
-apoch = "apoch.cli.app:app"
+apoch = "apoch.cli.app:entry_point"
 
 [project.entry-points."apoch.modules"]
 # First-party modules register here, e.g.:

@@ -61,8 +61,7 @@ class TestMainEntry:
             check=False,
         )
         assert result.returncode == 0, (
-            f"Expected exit code 0, got {result.returncode}. "
-            f"stderr: {result.stderr}"
+            f"Expected exit code 0, got {result.returncode}. stderr: {result.stderr}"
         )
         lower = result.stdout.lower()
         assert "usage" in lower or "help" in lower or "apoch" in lower, (

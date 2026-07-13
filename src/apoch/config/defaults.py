@@ -27,6 +27,7 @@ def fresh_defaults() -> dict:
         "modules": {},
     }
 
+
 # Known config keys — used to detect unknown keys in user YAML
 KNOWN_KEYS: frozenset = frozenset(DEFAULT_CONFIG.keys())
 

@@ -24,12 +24,17 @@ class StateTransitionError(ApochError):
     """Raised when an invalid module state transition is attempted."""
 
 
+class ConfigError(ApochError):
+    """Raised when the configuration cannot be loaded or parsed."""
+
+
 class StorageError(ApochError):
     """Raised when a storage operation (read/write/delete) fails."""
 
 
 __all__ = [
     "ApochError",
+    "ConfigError",
     "ModuleLoadError",
     "LifecycleError",
     "StateTransitionError",
