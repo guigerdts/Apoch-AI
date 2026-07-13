@@ -104,6 +104,26 @@ def user_config_dir() -> Path:
     return base / "apoch"
 
 
+def user_data_dir() -> Path:
+    """Return the platform-appropriate Apoch-AI data directory.
+
+    Order of precedence:
+    1. ``$APOCH_HOME`` environment variable (explicit override)
+    2. Platform default (``~/.local/share/apoch`` on Linux/macOS,
+       ``%LOCALAPPDATA%\\apoch`` on Windows)
+    """
+    env = os.environ.get("APOCH_HOME")
+    if env:
+        return Path(env)
+
+    if IS_WINDOWS:
+        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
+
+    return base / "apoch"
+
+
 def apoch_home() -> Path:
     """Return the Apoch-AI data directory (``~/.apoch`` or ``$APOCH_HOME``)."""
     env = os.environ.get("APOCH_HOME")
@@ -168,6 +188,7 @@ __all__ = [
     "set_signal_handler",
     "restore_signal_handler",
     "user_config_dir",
+    "user_data_dir",
     "apoch_home",
     "safe_decode",
     "safe_encode",

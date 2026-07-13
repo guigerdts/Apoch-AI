@@ -1,6 +1,6 @@
 [project]
 name = "apoch-ai"
-version = "0.1.0"
+version = "0.3.0-alpha"
 description = "Agent-agnostic Python framework for AI-assisted development workflows"
 requires-python = ">=3.13"
 dependencies = [
@@ -14,8 +14,7 @@ dependencies = [
 apoch = "apoch.cli.app:entry_point"
 
 [project.entry-points."apoch.modules"]
-# First-party modules register here, e.g.:
-# chronicle = "apoch.modules.chronicle.module:ChronicleModule"
+chronicle = "apoch.modules.chronicle.module:ChronicleModule"
 
 [project.entry-points."apoch.plugins"]
 # Third-party plugins register here
