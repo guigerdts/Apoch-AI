@@ -15,6 +15,10 @@ from apoch.core.module import Context, Module, ModuleMetadata, ModuleState
 
 logger = logging.getLogger(__name__)
 
+# Sentinel type for the Guardian reference — we duck-type instead of
+# importing from ``modules.guardian`` to keep Core import-free.
+_GuardianLike = Any
+
 
 class ModuleRegistry:
     """Discovers and loads Apoch-AI modules, drives lifecycle.
@@ -22,6 +26,11 @@ class ModuleRegistry:
     **Registrar/discoverer ONLY** — no business logic.  Discovers modules,
     loads on demand, and filters by config.  Never auto-instantiates during
     discovery.
+
+    When a module named ``guardian`` is loaded, the registry stores an
+    internal reference and delegates lifecycle calls to
+    ``GuardianModule.protect()`` for all *other* modules.  Guardian's own
+    lifecycle uses a raw try/except (it cannot protect itself).
 
     Usage::
 
@@ -36,6 +45,7 @@ class ModuleRegistry:
         self._config: dict[str, Any] = config or {}
         self._loaded: dict[str, Module] = {}
         self._init_order: list[str] = []
+        self._guardian: _GuardianLike = None
 
     # ------------------------------------------------------------------
     # Discovery
@@ -99,6 +109,11 @@ class ModuleRegistry:
 
         self._loaded[name] = instance
         self._init_order.append(name)
+
+        # Capture Guardian reference — Core must NOT import modules.guardian
+        if name == "guardian":
+            self._guardian = instance
+
         return instance
 
     # ------------------------------------------------------------------
@@ -108,33 +123,55 @@ class ModuleRegistry:
     async def start_all(self, context: Context) -> None:
         """Call ``start(context)`` on each loaded module in init order.
 
-        Exceptions from individual modules are caught so that one failing
-        module does not prevent others from starting.
+        If the ``guardian`` module is loaded, its ``protect()`` method
+        wraps each non-Guardian lifecycle call with exception isolation.
+        Guardian's own lifecycle uses a raw try/except (self-protection
+        is impossible).
         """
         for name in self._init_order:
             mod = self._loaded[name]
-            try:
-                await mod.start(context)
-            except Exception as exc:
-                logger.exception("Module '%s' failed during start(): %s", name, exc)
-                mod._state = ModuleState.FAILED  # type: ignore[attr-defined]
+            use_guardian = (
+                self._guardian is not None
+                and mod is not self._guardian
+                and hasattr(self._guardian, "protect")
+            )
+            if use_guardian:
+                await self._guardian.protect(mod.start(context), mod)
+            else:
+                # Raw try/except for Guardian itself, or if no Guardian
+                # is loaded (backward-compatible fallback).
+                try:
+                    await mod.start(context)
+                except Exception as exc:
+                    logger.exception("Module '%s' failed during start(): %s", name, exc)
+                    mod._state = ModuleState.FAILED  # type: ignore[attr-defined]
 
     async def stop_all(self) -> None:
         """Call ``stop()`` then ``shutdown()`` in reverse init order.
 
-        Exceptions from individual modules are caught so that all modules
-        get a chance to shut down.
+        Uses the same Guardian delegation pattern as :meth:`start_all`.
         """
         for name in reversed(self._init_order):
             mod = self._loaded[name]
-            try:
-                await mod.stop()
-            except Exception as exc:
-                logger.exception("Module '%s' failed during stop(): %s", name, exc)
-            try:
-                await mod.shutdown()
-            except Exception as exc:
-                logger.exception("Module '%s' failed during shutdown(): %s", name, exc)
+            use_guardian = (
+                self._guardian is not None
+                and mod is not self._guardian
+                and hasattr(self._guardian, "protect")
+            )
+            if use_guardian:
+                await self._guardian.protect(mod.stop(), mod)
+            else:
+                try:
+                    await mod.stop()
+                except Exception as exc:
+                    logger.exception("Module '%s' failed during stop(): %s", name, exc)
+            if use_guardian:
+                await self._guardian.protect(mod.shutdown(), mod)
+            else:
+                try:
+                    await mod.shutdown()
+                except Exception as exc:
+                    logger.exception("Module '%s' failed during shutdown(): %s", name, exc)
 
     # ------------------------------------------------------------------
     # Read-only accessors
