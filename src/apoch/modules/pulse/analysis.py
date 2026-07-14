@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from apoch.modules.pulse.models import TrendPoint, WorkUnit
@@ -33,6 +34,7 @@ class ProductivitySummary:
     avg_cost_per_unit: Decimal | None = None
     avg_time_per_unit: float = 0.0
     rework_rate: float = 0.0  # v1: token-based proxy
+    rework_method: str = "none"  # "line", "token", or "none"
 
 
 class Analysis:
@@ -45,34 +47,83 @@ class Analysis:
     """
 
     @classmethod
-    def rework_rate(cls, units: list[WorkUnit]) -> float:
-        """Estimate rework rate from available measurement data.
+    def rework_rate(
+        cls,
+        units: list[WorkUnit],
+        window_days: int = 30,
+    ) -> tuple[float, str]:
+        """Compute rework rate from available measurement data.
 
-        For v1, this is a token-based proxy: it compares the ratio of
-        output tokens to input tokens across all work units.
+        Primary method: line-based calculation when any unit has
+        ``lines_original > 0``.  Falls back to a token-based proxy
+        when no line data is available.
 
-        * ratio ≈ 1 → balanced generation, low rework
-        * ratio << 1 → high rework (much input for little output)
+        Returns ``(rate, method)`` where *method* is ``"line"``,
+        ``"token"``, or ``"none"``.
 
-        Returns 0.0 for empty or single-unit sets, or when the proxy
-        does not apply.  Future enrichment with diff metadata will
-        provide an accurate line-based calculation (R5).
+        Line-based formula:
+            rate = min(sum(lines_modified) / sum(lines_original), 1.0)
+
+        Token-based proxy (legacy):
+            rate = max(0.0, 1.0 - total_output / total_input)
+
+        Units outside the *window_days* window (based on ``completed_at``
+        from earliest ``created_at``) are excluded from line-based
+        calculation.
         """
         if len(units) < 2:
-            return 0.0
+            return (0.0, "none")
 
+        # Check for line data
+        has_lines = any(u.lines_original > 0 for u in units)
+
+        if has_lines:
+            # Determine window cutoff
+            created_times = [
+                u.created_at for u in units if u.created_at
+            ]
+            if created_times:
+                earliest = min(created_times)
+                try:
+                    earliest_dt = datetime.fromisoformat(earliest)
+                    cutoff = earliest_dt + timedelta(days=window_days)
+                except (ValueError, TypeError):
+                    cutoff = None
+            else:
+                cutoff = None
+
+            if cutoff is not None:
+                filtered = [
+                    u for u in units
+                    if u.completed_at and u.created_at
+                    and datetime.fromisoformat(u.completed_at) <= cutoff
+                ]
+            else:
+                filtered = list(units)
+
+            if not filtered:
+                return (0.0, "none")
+
+            total_orig = sum(u.lines_original for u in filtered)
+            total_mod = sum(u.lines_modified for u in filtered)
+
+            if total_orig == 0:
+                return (0.0, "none")
+
+            rate = min(total_mod / total_orig, 1.0)
+            return (round(rate, 4), "line")
+
+        # Token-based fallback
         total_in = sum(u.tokens_input for u in units)
         total_out = sum(u.tokens_output for u in units)
 
         if total_out == 0 or total_in == 0:
-            return 0.0
+            return (0.0, "token")
 
         ratio = total_out / total_in
-        # ratio of 1.0 means output ≈ input → low rework
-        # ratio < 0.5 means high input for low output → possible rework
         if ratio >= 1.0:
-            return 0.0
-        return round(1.0 - ratio, 4)
+            return (0.0, "token")
+        return (round(1.0 - ratio, 4), "token")
 
     @classmethod
     def trend(
@@ -143,6 +194,7 @@ class Analysis:
             else None
         )
 
+        rework_rate, rework_method = cls.rework_rate(units)
         return ProductivitySummary(
             total_work_units=count,
             total_tokens_input=total_in,
@@ -152,7 +204,8 @@ class Analysis:
             avg_tokens_per_unit=round((total_in + total_out) / count, 2),
             avg_cost_per_unit=avg_cost,
             avg_time_per_unit=round(total_time / count, 2),
-            rework_rate=cls.rework_rate(units),
+            rework_rate=rework_rate,
+            rework_method=rework_method,
         )
 
     @classmethod

@@ -6,7 +6,9 @@ Design: Pulse — Engineering Productivity Intelligence §File Changes
 
 from __future__ import annotations
 
+import sqlite3
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
@@ -238,6 +240,143 @@ class TestAnalysis:
         assert not hasattr(mod, "aggregate")
         assert not hasattr(mod, "optimize")
         assert not hasattr(mod, "recommend")
+
+
+class TestCostCalculation:
+    """PulseModule.record() MUST calculate cost from pricing config (R2)."""
+
+    async def test_cost_calculated_from_pricing(self, context: Context) -> None:
+        """GIVEN pricing config WHEN cost is None THEN cost = tokens × price."""
+        pricing = {"claude-4": Decimal("0.00001")}
+        mod = PulseModule({"model_pricing": pricing})
+        await mod.start(context)
+        unit = mod.record(MeasurementInput(
+            session_id="s1", work_unit_id="wu-1", model="claude-4",
+            tokens_input=100, tokens_output=50, wall_clock_s=30.0,
+            cost=None,
+        ))
+        # (100 + 50) × 0.00001 = 0.0015
+        assert unit.cost == Decimal("0.0015")
+
+    async def test_explicit_cost_passthrough(self, context: Context) -> None:
+        """GIVEN explicit cost WHEN recorded THEN cost is used as-is."""
+        pricing = {"claude-4": Decimal("0.00001")}
+        mod = PulseModule({"model_pricing": pricing})
+        await mod.start(context)
+        unit = mod.record(MeasurementInput(
+            session_id="s1", work_unit_id="wu-1", model="claude-4",
+            tokens_input=100, tokens_output=50, wall_clock_s=30.0,
+            cost=Decimal("0.9999"),  # explicit override
+        ))
+        assert unit.cost == Decimal("0.9999")
+
+    async def test_missing_price_logs_warning(
+        self, context: Context, caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """GIVEN no price for model WHEN cost is None THEN warning logged."""
+        import logging
+        caplog.set_level(logging.WARNING)
+        pricing = {"some-other-model": Decimal("0.00001")}
+        mod = PulseModule({"model_pricing": pricing})
+        await mod.start(context)
+        mod.record(MeasurementInput(
+            session_id="s1", work_unit_id="wu-1", model="claude-4",
+            tokens_input=100, tokens_output=50, wall_clock_s=30.0,
+            cost=None,
+        ))
+        assert "No price configured for model 'claude-4'" in caplog.text
+
+    async def test_missing_price_cost_stays_none(self, context: Context) -> None:
+        """GIVEN no price for model WHEN cost is None THEN cost stays None."""
+        pricing = {"some-other-model": Decimal("0.00001")}
+        mod = PulseModule({"model_pricing": pricing})
+        await mod.start(context)
+        unit = mod.record(MeasurementInput(
+            session_id="s1", work_unit_id="wu-1", model="claude-4",
+            tokens_input=100, tokens_output=50, wall_clock_s=30.0,
+            cost=None,
+        ))
+        assert unit.cost is None
+
+    async def test_no_pricing_config_no_cost(self, context: Context) -> None:
+        """GIVEN no model_pricing config WHEN cost is None THEN cost stays None."""
+        mod = PulseModule({})
+        await mod.start(context)
+        unit = mod.record(MeasurementInput(
+            session_id="s1", work_unit_id="wu-1", model="claude-4",
+            tokens_input=100, tokens_output=50, wall_clock_s=30.0,
+            cost=None,
+        ))
+        assert unit.cost is None
+
+    async def test_cost_with_zero_tokens(self, context: Context) -> None:
+        """GIVEN pricing config WHEN zero tokens THEN cost is 0."""
+        pricing = {"claude-4": Decimal("0.00001")}
+        mod = PulseModule({"model_pricing": pricing})
+        await mod.start(context)
+        unit = mod.record(MeasurementInput(
+            session_id="s1", work_unit_id="wu-1", model="claude-4",
+            tokens_input=0, tokens_output=0, wall_clock_s=30.0,
+            cost=None,
+        ))
+        assert unit.cost == Decimal("0")
+
+
+class TestSqliteLifecycle:
+    """PulseModule lifecycle with SQLite persistence (R10)."""
+
+    async def test_start_opens_sqlite(self, tmp_path: Path, context: Context) -> None:
+        """start() MUST create a SQLite database and pass it to PulseStore."""
+        db_path = tmp_path / "pulse.db"
+        mod = PulseModule({"pulse_db_path": str(db_path)})
+        await mod.start(context)
+        # Verify the file was created
+        assert db_path.exists()
+        # Verify PulseStore has a SQLite connection
+        assert mod._store is not None
+        assert mod._store._conn is not None
+        # Verify schema was initialised
+        tables = mod._store._conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+        ).fetchall()
+        names = [r[0] for r in tables]
+        assert "work_units" in names
+        await mod.stop()
+
+    async def test_stop_closes_connection(self, tmp_path: Path, context: Context) -> None:
+        """stop() MUST close the SQLite connection."""
+        db_path = tmp_path / "pulse.db"
+        mod = PulseModule({"pulse_db_path": str(db_path)})
+        await mod.start(context)
+        conn = mod._store._conn
+        assert conn is not None
+        await mod.stop()
+        # Connection should be closed
+        with pytest.raises(sqlite3.ProgrammingError):
+            conn.execute("SELECT 1")
+
+    async def test_end_to_end_with_sqlite(self, tmp_path: Path, context: Context) -> None:
+        """Record → list → get with SQLite persistence via PulseModule."""
+        db_path = tmp_path / "pulse.db"
+        mod = PulseModule({"pulse_db_path": str(db_path)})
+        await mod.start(context)
+
+        unit = mod.record(MeasurementInput(
+            session_id="s1", work_unit_id="wu-1", model="claude-4",
+            tokens_input=100, tokens_output=50, wall_clock_s=30.0,
+        ))
+        assert unit.id == "wu-1"
+        assert mod.count() == 1
+        assert mod.get("wu-1") is not None
+        await mod.stop()
+
+    async def test_in_memory_when_no_db_path(self, config: dict, context: Context) -> None:
+        """start() MUST use in-memory PulseStore when pulse_db_path is not set."""
+        mod = PulseModule(config)
+        await mod.start(context)
+        assert mod._store is not None
+        assert mod._store._conn is None
+        await mod.stop()
 
 
 class TestCrossModuleServices:

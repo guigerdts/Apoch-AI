@@ -70,6 +70,21 @@ class TestWorkUnit:
         assert not hasattr(unit, "memory")
         assert not hasattr(unit, "latency")
 
+    def test_default_lines(self) -> None:
+        """WorkUnit MUST default lines_original and lines_modified to 0 (R5)."""
+        unit = WorkUnit(id="u1", session_id="s1", model="claude-4",
+                        tokens_input=100, tokens_output=50, wall_clock_s=30.0)
+        assert unit.lines_original == 0
+        assert unit.lines_modified == 0
+
+    def test_lines_backward_compatible(self) -> None:
+        """WorkUnit with explicit line data MUST preserve them."""
+        unit = WorkUnit(id="u1", session_id="s1", model="claude-4",
+                        tokens_input=100, tokens_output=50, wall_clock_s=30.0,
+                        lines_original=100, lines_modified=20)
+        assert unit.lines_original == 100
+        assert unit.lines_modified == 20
+
 
 class TestMeasurementInput:
     """MeasurementInput is the mutable input before storage."""
@@ -96,6 +111,25 @@ class TestMeasurementInput:
             cost=Decimal("0.015"),
         )
         assert inp.cost == Decimal("0.015")
+
+    def test_input_default_lines(self) -> None:
+        """MeasurementInput MUST default lines_original and lines_modified to 0."""
+        inp = MeasurementInput(
+            session_id="s1", work_unit_id="wu-1", model="claude-4",
+            tokens_input=100, tokens_output=50, wall_clock_s=30.0,
+        )
+        assert inp.lines_original == 0
+        assert inp.lines_modified == 0
+
+    def test_input_with_lines(self) -> None:
+        """MeasurementInput MAY carry line-based rework data."""
+        inp = MeasurementInput(
+            session_id="s1", work_unit_id="wu-1", model="claude-4",
+            tokens_input=100, tokens_output=50, wall_clock_s=30.0,
+            lines_original=100, lines_modified=20,
+        )
+        assert inp.lines_original == 100
+        assert inp.lines_modified == 20
 
 
 class TestWorkUnitFilter:

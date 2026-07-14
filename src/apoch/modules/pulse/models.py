@@ -29,6 +29,8 @@ class WorkUnit:
     cost: Decimal | None = None
     created_at: str = ""  # ISO 8601 with µs, UTC
     completed_at: str | None = None  # ISO 8601; None if in-progress
+    lines_original: int = 0
+    lines_modified: int = 0
 
 
 @dataclass
@@ -47,6 +49,8 @@ class MeasurementInput:
     tokens_output: int
     wall_clock_s: float
     cost: Decimal | None = None
+    lines_original: int = 0
+    lines_modified: int = 0
 
 
 @dataclass
