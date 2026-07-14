@@ -54,26 +54,26 @@ Chain strategy: pending
 
 ## Phase 4: OptimizerModule — Lifecycle + Orchestration
 
-- [ ] 4.1 **RED**: Write `tests/modules/optimizer/test_module.py` — `TestLifecycle`: initial LOADED state, start→RUNNING, stop→STOPPED, shutdown→SHUTDOWN, full lifecycle, idempotent stop via `_pre_stop` guard.
-- [ ] 4.2 **GREEN**: Create `src/apoch/modules/optimizer/module.py` — `OptimizerModule(Module)` with `start()` (register 6 detectors, store context), `stop()` (clear state), `shutdown()` (no-op), sentinel `_get_measurements()`. Verify lifecycle tests pass.
-- [ ] 4.3 **RED**: `TestOrchestration` — `_run_cycle()` returns flat hypotheses, detector isolation (one detector raises → others still produce results), stable sort order (detector order → confidence desc → generated_at asc), determinism (same input × 2 → identical list).
-- [ ] 4.4 **GREEN**: Wire `_run_cycle()` with `try/except` per detector, `_sort_hypotheses()` for stable ordering. Verify orchestration tests pass.
+- [x] 4.1 **RED**: Write `tests/modules/optimizer/test_module.py` — `TestLifecycle`: initial LOADED state, start→RUNNING, stop→STOPPED, shutdown→SHUTDOWN, full lifecycle, idempotent stop via `_pre_stop` guard.
+- [x] 4.2 **GREEN**: Create `src/apoch/modules/optimizer/module.py` — `OptimizerModule(Module)` with `start()` (register 6 detectors, store context), `stop()` (clear state), `shutdown()` (no-op), sentinel `_get_measurements()`. Verify lifecycle tests pass.
+- [x] 4.3 **RED**: `TestOrchestration` — `_run_cycle()` returns flat hypotheses, detector isolation (one detector raises → others still produce results), stable sort order (detector order → confidence desc → generated_at asc), determinism (same input × 2 → identical list).
+- [x] 4.4 **GREEN**: Wire `_run_cycle()` with `try/except` per detector, `_sort_hypotheses()` for stable ordering. Verify orchestration tests pass.
 
 ## Phase 5: Services, Registration, Entry Points
 
-- [ ] 5.1 **RED+GREEN**: Add `services` property: `"optimizer.hypotheses"` → `_run_cycle`, `"optimizer.baselines"` → `_get_baselines`, `"optimizer.status"` → `_get_status`. Test service wiring, correct types, Pulse optionality (`pulse_connected: false`), status dict shape.
-- [ ] 5.2 **RED+GREEN**: Create `src/apoch/modules/optimizer/__init__.py` — lazy-import `OptimizerModule` via `__getattr__` (Pulse pattern). Test import, `__all__`.
-- [ ] 5.3 **RED+GREEN**: Modify `src/apoch/modules/__init__.py` — add `"optimizer"` to `__all__`. Modify `pyproject.toml` — add `optimizer = "apoch.modules.optimizer.module:OptimizerModule"` entry point. Test entry point resolution via `importlib.metadata.entry_points`.
+- [x] 5.1 **RED+GREEN**: Add `services` property: `"optimizer.hypotheses"` → `_run_cycle`, `"optimizer.baselines"` → `_calculate_baselines`, `"optimizer.status"` → `_get_status`. Test service wiring, correct types, Pulse optionality (`pulse_connected: false`), status dict shape.
+- [x] 5.2 **RED+GREEN**: Create `src/apoch/modules/optimizer/__init__.py` — lazy-import `OptimizerModule` via `__getattr__` (Pulse pattern). Test import, `__all__`.
+- [x] 5.3 **RED+GREEN**: Modify `src/apoch/modules/__init__.py` — add `"optimizer"` to `__all__`. Modify `pyproject.toml` — add `optimizer = "apoch.modules.optimizer.module:OptimizerModule"` entry point. Test entry point resolution via `pyproject.toml` reading.
 
 ## Phase 6: Integration & End-to-End Validation
 
-- [ ] 6.1 **RED+GREEN**: Full integration test: create `Context` with Pulse `pulse.measurements` → start `OptimizerModule` → run cycle → verify hypotheses of correct types with confidence in [0.0, 1.0].
-- [ ] 6.2 **RED+GREEN**: Pulse absent test: start without Pulse → empty hypotheses, `pulse_connected: false`, `hypothesis_count: 0`.
-- [ ] 6.3 **RED+GREEN**: Purity tests: input list not mutated after `_run_cycle()`, frozen dataclass enforced at field-write.
-- [ ] 6.4 **RED+GREEN**: Boundary tests: single WorkUnit (underpowered → capped confidence), empty list, thousands of units, all-None metrics.
-- [ ] 6.5 **RED+GREEN**: Determinism test: same input × 2 calls → `==` on full hypothesis list (excluding `generated_at`), identical output shape.
+- [x] 6.1 **RED+GREEN**: Full integration test: create `Context` with Pulse `pulse.measurements` → start `OptimizerModule` → run cycle → verify hypotheses of correct types with confidence in [0.0, 1.0].
+- [x] 6.2 **RED+GREEN**: Pulse absent test: start without Pulse → empty hypotheses, `pulse_connected: false`, `hypothesis_count: 0`.
+- [x] 6.3 **RED+GREEN**: Purity tests: input list not mutated after `_run_cycle()`, frozen dataclass enforced at field-write.
+- [x] 6.4 **RED+GREEN**: Boundary tests: single WorkUnit (underpowered → capped confidence), empty list, thousands of units, all-None metrics.
+- [x] 6.5 **RED+GREEN**: Determinism test: same input × 2 calls → `==` on full hypothesis list (excluding `generated_at`), identical output shape.
 
 ## Phase 7: Cleanup
 
-- [ ] 7.1 Run full test suite: `uv run pytest tests/modules/optimizer/ -v`. All RED+GREEN pairs pass, no stray files.
-- [ ] 7.2 `uv run ruff check src/apoch/modules/optimizer/ tests/modules/optimizer/` — no lint violations.
+- [x] 7.1 Run full test suite: `uv run pytest tests/modules/optimizer/ -v`. All RED+GREEN pairs pass, no stray files.
+- [x] 7.2 `uv run ruff check src/apoch/modules/optimizer/ tests/modules/optimizer/` — no lint violations.

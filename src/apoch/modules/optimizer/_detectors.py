@@ -9,11 +9,13 @@ from __future__ import annotations
 import datetime
 import math
 import statistics
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from apoch.modules.optimizer._confidence import cap_underpowered
 from apoch.modules.optimizer.models import OptimizationHypothesis
-from apoch.modules.pulse.models import WorkUnit
+
+if TYPE_CHECKING:
+    from apoch.modules.pulse.models import WorkUnit
 
 # ── Protocol ─────────────────────────────────────────────────────────
 
