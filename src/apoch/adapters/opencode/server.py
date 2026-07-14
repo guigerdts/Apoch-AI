@@ -21,11 +21,25 @@ from typing import Any
 
 from jsonschema import validate as js_validate
 from jsonschema.exceptions import SchemaError, ValidationError
+from pydantic import Field, create_model
 
 from apoch.adapters.base import AgentAdapter, HealthStatus, ToolDef
 from apoch.core.exceptions import ToolExecutionError
 
 logger = logging.getLogger(__name__)
+
+
+def _json_type_to_python(json_type: str) -> type:
+    """Map a JSON Schema type name to the corresponding Python type."""
+    mapping: dict[str, type] = {
+        "string": str,
+        "integer": int,
+        "number": float,
+        "boolean": bool,
+        "object": dict,
+        "array": list,
+    }
+    return mapping.get(json_type, str)
 
 
 @dataclass
@@ -170,6 +184,12 @@ class OpenCodeAdapter(AgentAdapter):
                 name=final_name,
                 description=tool.description,
             )
+
+            # Override FastMCP's auto-generated Pydantic arg_model. Without
+            # this, the **kwargs handler signature generates a model dictating
+            # a single "kwargs" field, which rejects all real call payloads.
+            self._override_tool_arg_model(final_name, tool.input_schema)
+
             self._registered_names.add(final_name)
             self._module_tools[module_name].append(tool)
 
@@ -295,6 +315,42 @@ class OpenCodeAdapter(AgentAdapter):
         _handler.__name__ = name
         _handler.__doc__ = description
         return _handler
+
+    def _override_tool_arg_model(self, tool_name: str, input_schema: dict) -> None:
+        """Replace FastMCP's auto-generated arg model with one from *input_schema*.
+
+        FastMCP generates a Pydantic model from the handler's ``**kwargs``
+        signature, which creates a single required ``kwargs: str`` field that
+        rejects real tool-call payloads.  We replace it with a proper model
+        built from our ``ToolDef.input_schema`` so FastMCP validates correctly
+        before our ``_dispatch`` runs its own jsonschema validation.
+        """
+        from mcp.server.fastmcp.utilities.func_metadata import ArgModelBase  # noqa: PLC0415
+
+        registered_tool = self._server._tool_manager._tools.get(tool_name)
+        if registered_tool is None:
+            return
+
+        props = input_schema.get("properties", {})
+        required = set(input_schema.get("required", []))
+
+        fields: dict[str, tuple[Any, Any]] = {}
+        for prop_name, prop_schema in props.items():
+            py_type = _json_type_to_python(prop_schema.get("type", "string"))
+            if prop_name in required:
+                fields[prop_name] = (py_type, Field(...))
+            else:
+                default = prop_schema.get("default", None)
+                fields[prop_name] = (py_type | None, default)
+
+        arg_model = create_model(
+            f"{tool_name}Arguments",
+            __base__=ArgModelBase,
+            **fields,
+        )
+
+        registered_tool.parameters = input_schema
+        registered_tool.fn_metadata.arg_model = arg_model
 
     # ------------------------------------------------------------------
     # Install / Uninstall (synchronous config management)

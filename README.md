@@ -4,8 +4,7 @@ Enhancement framework for AI coding agents.
 Augments OpenCode and other agents with intelligent modules:
 memory, context management, code intelligence, observability, integrations.
 Stack: Python. Cross-platform. Developer-first.
-**Estado:** v0.5.0-alpha — Core + 3 módulos implementados (Chronicle, Guardian, Vision).
-
+**Estado:** v0.7.0-alpha — Infrastructure Roadmap complete. Now in Product Features phase.
 
 # Apoch-AI
 
@@ -139,24 +138,20 @@ These are considered part of the platform.
 
 Apoch-AI introduces the following native modules.
 
-Status: ✅ Implemented — 🔄 In progress — ⏳ Pending
+Status: ✅ Implemented — 🔄 Product iteration — ⏳ Pending
 
-Chronicle ✅ `v0.3.0-alpha`
+Chronicle ✅ `v0.3.0-alpha` → 🔄 PR5
 
 Activity recording and timeline generation. SQLite-based event store with WAL,
-auto-prune, and dynamic filter queries. Implements spec subset: event recording,
-persistent storage, query interface, retention/pruning.
+auto-prune, and dynamic filter queries. **PR5 adds**: filters, search, tags, time
+ranges, limits, ordering, metrics — making Chronicle the system's operational
+memory.
 
-Oracle ⏳
-
-Decision analysis and reasoning.
-
-Guardian ✅ `v0.4.0-alpha`
+Guardian ✅ `v0.4.0-alpha` → 🔄 PR6
 
 Exception isolation and execution boundaries. Wraps module lifecycle calls
-with structured diagnostics capture. Implements spec subset: exception boundaries,
-state tracking, post-failure diagnostics, graceful degradation. Timeouts and
-policy enforcement deferred to future releases.
+with structured diagnostics capture. **PR6 adds**: health reports, dependency
+checks, startup verification, runtime status, recommendations.
 
 Vision ✅ `v0.6.0-alpha`
 
@@ -164,37 +159,34 @@ Full observability suite: structured NDJSON logging with rotation, ring buffer, 
 state/config introspection, system info (PID, memory, platform), degraded mode support,
 and optional Chronicle integration via duck-typed services.
 
-Pulse ⏳
-
-Performance benchmarking.
-
-Optimizer ⏳
-
-Context and token optimization.
-
 ---
 
 # 10. Roadmap
 
-Development follows the approved roadmap. Current progress:
+## Infrastructure Roadmap (PR1–PR4) — ✅ COMPLETED
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| Phase 0 | Foundation (project setup, uv, CI, testing) | ✅ Complete |
-| Phase 1 | Core (Engine, Module, Registry, Events, Config, Exceptions) | ✅ Complete — `v0.1.0` |
-| Phase 2 | OpenCode Integration (Adapter, CLI, opencode.json manager) | ✅ Complete — `v0.2.0-alpha` |
-| Phase 3 | Core Modules | 🔄 In progress |
-| | — PR3A: Chronicle Foundation | ✅ `v0.3.0-alpha` |
-| | — PR3B: Guardian Module | ✅ `v0.4.0-alpha` |
-| | — PR3C-A: Vision Foundation | ✅ `v0.5.0-alpha` |
-| | — PR3C-B: Vision Query APIs | ✅ `v0.6.0-alpha` |
-| | — Pulse, Optimizer, Oracle | ⏳ Pending |
-| Phase 4 | Ecosystem | ⏳ Pending |
-| Phase 5 | Stabilization | ⏳ Pending |
+| Phase | Description | Version | Status |
+|-------|-------------|---------|--------|
+| Phase 0 | Foundation (project setup, uv, CI, testing) | — | ✅ |
+| PR1 | Core Engine (Module, Registry, Events, Config, Exceptions, CLI) | `v0.1.0` — `v0.2.0-alpha` | ✅ |
+| PR2 | OpenCode Integration (Adapter, MCP gateway, CLI lifecycle) | `v0.3.0-alpha` | ✅ |
+| PR3A | Chronicle Foundation — SQLite event store | `v0.4.0-alpha` | ✅ |
+| PR3B | Guardian Module — exception isolation, diagnostics | `v0.5.0-alpha` | ✅ |
+| PR3C-A | Vision Foundation — NDJSON logging, services | `v0.6.0-alpha` | ✅ |
+| PR3C-B | Vision Query APIs — introspection, system info | `v0.6.0-alpha` | ✅ |
+| PR4 | Agent Tool Dispatch Runtime — dispatch, validation, E2E gate | `v0.7.0-alpha` | ✅ |
 
-The roadmap is considered frozen.
+## Product Features Roadmap (PR5+) — 🆕 Active
 
-Any modification requires explicit approval.
+| PR | Module | Focus | Goal |
+|----|--------|-------|------|
+| **PR5** | Chronicle | Product Features | Filters, search, tags, time ranges, limits, ordering, metrics |
+| **PR6** | Guardian | Runtime & Health | Health reports, dependency checks, runtime status, recommendations |
+| **PR7** | CLI | Unified Lifecycle | `apoch start\|stop\|status\|doctor` |
+| **PR8** | — | First Consumer | OpenCode workflows or agent — real usage drives refinements |
+
+**Principle**: Value first, infrastructure second. Every PR must answer:
+> "¿Qué hace que Apoch sea más útil mañana para un usuario?"
 
 ---
 

@@ -26,12 +26,12 @@ Chain strategy: stacked-to-main
 
 ## PR4B — Dispatch Runtime
 
-- [ ] 2.1 `_dispatch()` in `_make_tool_handler`: lookup `_tool_registry` → `TOOL_NOT_FOUND`, validate kwargs with `jsonschema.validate()` → `VALIDATION_ERROR`, call handler, `isawaitable()` check → await if needed
-- [ ] 2.2 Wrap dispatch in try/except: `ToolExecutionError` → structured error, any other exception → `MODULE_ERROR` / `INTERNAL_ERROR`
-- [ ] 2.3 Structured response formatting: success `{"version": 1, "ok": true, "data": result}`, error `{"version": 1, "ok": false, "error": {"code": "...", "message": "..."}}`
-- [ ] 2.4 VisionModule: update `get_tool_defs()` — add `handler_name` to all 4 ToolDef entries
-- [ ] 2.5 ChronicleModule: add `get_tool_defs()` with chronicle_query (handler_name="query") and chronicle_stats (handler_name="stats")
-- [ ] 2.6 GuardianModule: add `get_tool_defs()` with guardian_diagnostics (handler_name="diagnostics") and guardian_alldiagnostics (handler_name="all_diagnostics")
-- [ ] 2.7 Tests: unit tests for schema validation, successful dispatch (sync + async), unknown tool, handler exception mapping
-- [ ] 2.8 E2E test: real FastMCP with mock module → `tools/list` verifies registration → `tools/call` verifies structured response
-- [ ] 2.9 Acceptance: `pytest` 100% green (including 309 existing tests), `ruff check` clean, `uv build` ok, CHANGELOG updated, OpenSpec synced
+- [x] 2.1 `_dispatch()` in `_make_tool_handler`: lookup `_tool_registry` → `TOOL_NOT_FOUND`, validate kwargs with `jsonschema.validate()` → `VALIDATION_ERROR`, call handler, `isawaitable()` check → await if needed
+- [x] 2.2 Wrap dispatch in try/except: `ToolExecutionError` → structured error, any other exception → `MODULE_ERROR` / `INTERNAL_ERROR`
+- [x] 2.3 Structured response formatting: success `{"version": 1, "ok": true, "data": result}`, error `{"version": 1, "ok": false, "error": {"code": "...", "message": "..."}}`
+- [x] 2.4 VisionModule: update `get_tool_defs()` — add `handler_name` to all 4 ToolDef entries
+- [x] 2.5 ChronicleModule: add `get_tool_defs()` with chronicle_query (handler_name="query") and chronicle_stats (handler_name="stats")
+- [x] 2.6 GuardianModule: add `get_tool_defs()` with guardian_diagnostics (handler_name="diagnostics") and guardian_alldiagnostics (handler_name="all_diagnostics")
+- [x] 2.7 Tests: unit tests for schema validation, successful dispatch (sync + async), unknown tool, handler exception mapping
+- [x] 2.8 E2E test: real FastMCP with mock module → `tools/list` verifies registration → `tools/call` verifies structured response
+- [x] 2.9 Acceptance: `pytest` 100% green (including 309 existing tests), `ruff check` clean, `uv build` ok, CHANGELOG updated, OpenSpec synced
