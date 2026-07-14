@@ -25,9 +25,8 @@ from decimal import Decimal
 
 import pytest
 
-from apoch.modules.pulse.analysis import Analysis, ProductivitySummary
-from apoch.modules.pulse.models import TrendPoint, WorkUnit
-
+from apoch.modules.pulse.analysis import Analysis
+from apoch.modules.pulse.models import WorkUnit
 
 # -----------------------------------------------------------------------
 # Fixtures
@@ -137,17 +136,22 @@ class TestReworkRate:
     """Analysis.rework_rate() — token-based rework proxy (R5)."""
 
     def test_empty_list_returns_zero(self, empty_units: list[WorkUnit]) -> None:
-        assert Analysis.rework_rate(empty_units) == 0.0
+        rate, method = Analysis.rework_rate(empty_units)
+        assert rate == 0.0
+        assert method == "none"
 
     def test_single_unit_returns_zero(self, single_unit: list[WorkUnit]) -> None:
-        assert Analysis.rework_rate(single_unit) == 0.0
+        rate, method = Analysis.rework_rate(single_unit)
+        assert rate == 0.0
+        assert method == "none"
 
     def test_balanced_output_returns_zero(
         self, two_balanced_units: list[WorkUnit],
     ) -> None:
         """Output ≈ Input → ratio ≈ 1.0 → rework_rate ≈ 0.0."""
-        rate = Analysis.rework_rate(two_balanced_units)
+        rate, method = Analysis.rework_rate(two_balanced_units)
         assert rate == 0.0
+        assert method == "token"
 
     def test_output_gt_input_returns_zero(self) -> None:
         """Output > Input → ratio > 1.0 → no rework signal."""
@@ -155,14 +159,17 @@ class TestReworkRate:
             dict(tokens_input=100, tokens_output=200),
             dict(tokens_input=50, tokens_output=100),
         )
-        assert Analysis.rework_rate(units) == 0.0
+        rate, method = Analysis.rework_rate(units)
+        assert rate == 0.0
+        assert method == "token"
 
     def test_low_output_detects_rework(
         self, two_rework_units: list[WorkUnit],
     ) -> None:
         """Output << Input → ratio << 1.0 → rework detected."""
-        rate = Analysis.rework_rate(two_rework_units)
+        rate, method = Analysis.rework_rate(two_rework_units)
         assert rate > 0.0
+        assert method == "token"
         # (100+200)=300 in, (10+20)=30 out → ratio=0.1 → rework=0.9
         assert rate == pytest.approx(0.9, abs=1e-4)
 
@@ -171,14 +178,18 @@ class TestReworkRate:
             dict(tokens_input=0, tokens_output=50),
             dict(tokens_input=0, tokens_output=30),
         )
-        assert Analysis.rework_rate(units) == 0.0
+        rate, method = Analysis.rework_rate(units)
+        assert rate == 0.0
+        assert method == "token"
 
     def test_total_out_zero_returns_zero(self) -> None:
         units = _make_units(
             dict(tokens_input=100, tokens_output=0),
             dict(tokens_input=200, tokens_output=0),
         )
-        assert Analysis.rework_rate(units) == 0.0
+        rate, method = Analysis.rework_rate(units)
+        assert rate == 0.0
+        assert method == "token"
 
     def test_deterministic(self) -> None:
         """Same input MUST produce the same rework_rate."""
@@ -186,8 +197,8 @@ class TestReworkRate:
             dict(tokens_input=200, tokens_output=50),
             dict(tokens_input=100, tokens_output=20),
         )
-        r1 = Analysis.rework_rate(units)
-        r2 = Analysis.rework_rate(units)
+        r1, _ = Analysis.rework_rate(units)
+        r2, _ = Analysis.rework_rate(units)
         assert r1 == r2
 
     def test_cost_none_does_not_affect_rework(self) -> None:
@@ -196,8 +207,9 @@ class TestReworkRate:
             dict(tokens_input=100, tokens_output=10, cost=None),
             dict(tokens_input=200, tokens_output=20, cost=Decimal("0.015")),
         )
-        rate = Analysis.rework_rate(units)
+        rate, method = Analysis.rework_rate(units)
         assert rate > 0.0
+        assert method == "token"
 
     def test_completed_at_none_does_not_affect_rework(self) -> None:
         """completed_at is not consumed by rework calculation."""
@@ -205,8 +217,135 @@ class TestReworkRate:
             dict(tokens_input=100, tokens_output=10, completed_at=None),
             dict(tokens_input=200, tokens_output=20, completed_at=None),
         )
-        rate = Analysis.rework_rate(units)
+        rate, method = Analysis.rework_rate(units)
         assert rate > 0.0
+        assert method == "token"
+
+
+class TestLineBasedRework:
+    """Analysis.rework_rate() — line-based primary, token fallback (R5)."""
+
+    def test_line_based_returns_rate_and_method(self) -> None:
+        """GIVEN units with line data THEN returns (rate, 'line')."""
+        units = _make_units(
+            dict(tokens_input=100, tokens_output=50, lines_original=100, lines_modified=20),
+            dict(tokens_input=200, tokens_output=100, lines_original=200, lines_modified=40),
+        )
+        rate, method = Analysis.rework_rate(units)
+        # (20+40) / (100+200) = 60/300 = 0.2
+        assert rate == pytest.approx(0.2, abs=1e-4)
+        assert method == "line"
+
+    def test_clamp_to_one(self) -> None:
+        """GIVEN lines_modified > lines_original THEN rate MUST clamp to 1.0."""
+        units = _make_units(
+            dict(tokens_input=100, tokens_output=50, lines_original=100, lines_modified=150),
+            dict(tokens_input=200, tokens_output=100, lines_original=200, lines_modified=500),
+        )
+        rate, method = Analysis.rework_rate(units)
+        assert rate == 1.0
+        assert method == "line"
+
+    def test_line_takes_priority_over_token(self) -> None:
+        """GIVEN units with both line and token data THEN line is used."""
+        units = _make_units(
+            dict(tokens_input=100, tokens_output=10, lines_original=100, lines_modified=20),
+            dict(tokens_input=200, tokens_output=20, lines_original=200, lines_modified=40),
+        )
+        rate, method = Analysis.rework_rate(units)
+        assert method == "line"
+        # Line-based: (20+40)/(100+200) = 0.2
+        assert rate == pytest.approx(0.2, abs=1e-4)
+
+    def test_no_line_data_falls_back_to_token(self) -> None:
+        """GIVEN no line data in any unit THEN fall back to token proxy."""
+        units = _make_units(
+            dict(tokens_input=100, tokens_output=10, lines_original=0, lines_modified=0),
+            dict(tokens_input=200, tokens_output=20, lines_original=0, lines_modified=0),
+        )
+        rate, method = Analysis.rework_rate(units)
+        assert method == "token"
+        assert rate > 0.0
+
+    def test_empty_returns_none(self, empty_units: list[WorkUnit]) -> None:
+        """GIVEN empty list THEN returns (0.0, 'none')."""
+        rate, method = Analysis.rework_rate(empty_units)
+        assert rate == 0.0
+        assert method == "none"
+
+    def test_single_unit_returns_none(self, single_unit: list[WorkUnit]) -> None:
+        """GIVEN single unit THEN returns (0.0, 'none')."""
+        rate, method = Analysis.rework_rate(single_unit)
+        assert rate == 0.0
+        assert method == "none"
+
+    def test_window_filters_old_units(self) -> None:
+        """GIVEN units outside window_days THEN they are excluded."""
+        import datetime
+        from datetime import UTC, timedelta
+
+        now = datetime.datetime.now(UTC)
+        old_dt = now - timedelta(days=60)
+        recent_dt = now
+        old = old_dt.isoformat()
+        recent = recent_dt.isoformat()
+        units = _make_units(
+            # Old unit: created 60d ago, completed 60d ago → within 30d window
+            dict(created_at=old, completed_at=old, lines_original=100, lines_modified=50),
+            # Recent unit: created now, completed now → outside 30d window
+            # (earliest is 60d ago, window=30d → cutoff 30d ago, now > cutoff)
+            dict(created_at=recent, completed_at=recent, lines_original=200, lines_modified=20),
+        )
+        # window_days=30 based on earliest created_at (60d ago)
+        # Cutoff: 60d ago + 30d = 30d ago
+        # Old unit completed 60d ago → within window
+        # Recent unit completed now → outside window
+        rate, method = Analysis.rework_rate(units, window_days=30)
+        assert method == "line"
+        # Only the old unit: 50/100 = 0.5
+        assert rate == pytest.approx(0.5, abs=1e-4)
+
+    def test_mixed_line_data_some_units_have_lines(self) -> None:
+        """GIVEN some units with line data and some without."""
+        units = _make_units(
+            dict(tokens_input=100, tokens_output=50, lines_original=100, lines_modified=20),
+            dict(tokens_input=200, tokens_output=100, lines_original=0, lines_modified=0),
+        )
+        rate, method = Analysis.rework_rate(units)
+        # At least one unit has lines_original > 0, so line-based is used
+        assert method == "line"
+        # Both units contribute to the line calc: (20+0)/(100+0) — division by zero?
+        # Actually lines_original=0 would make lines_mod=0 / lines_orig=0 for that unit
+        # The sum approach: total mod = 20+0 = 20, total orig = 100+0 = 100 → rate = 0.2
+        assert rate == pytest.approx(0.2, abs=1e-4)
+
+
+class TestProductivitySummaryReworkMethod:
+    """ProductivitySummary.rework_method MUST reflect rework analysis mode."""
+
+    def test_summary_includes_rework_method_line(self) -> None:
+        """GIVEN units with line data THEN rework_method='line'."""
+        units = _make_units(
+            dict(tokens_input=100, tokens_output=50, lines_original=100, lines_modified=20),
+            dict(tokens_input=200, tokens_output=100, lines_original=200, lines_modified=40),
+        )
+        s = Analysis.summary(units)
+        assert s.rework_rate > 0.0
+        assert s.rework_method == "line"
+
+    def test_summary_fallback_to_token(self) -> None:
+        """GIVEN only token data THEN rework_method='token'."""
+        units = _make_units(
+            dict(tokens_input=100, tokens_output=10),
+            dict(tokens_input=200, tokens_output=20),
+        )
+        s = Analysis.summary(units)
+        assert s.rework_rate > 0.0
+        assert s.rework_method == "token"
+
+    def test_summary_empty_default_none(self, empty_units: list[WorkUnit]) -> None:
+        s = Analysis.summary(empty_units)
+        assert s.rework_method == "none"
 
 
 # -----------------------------------------------------------------------
