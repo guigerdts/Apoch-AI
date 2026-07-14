@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.7.0-alpha] — 2026-07-14
+
+### Added
+
+- **Agent Tool Dispatch Runtime** (`adapters/opencode/server.py`): Real tool dispatch replacing the stub handler. Full dispatch lifecycle:
+  - `_dispatch()` — resolves tool by name, validates kwargs via JSON Schema, dispatches sync/async transparently, returns structured response
+  - JSON Schema validation via `jsonschema.validate()` — maps `ValidationError` → VALIDATION_ERROR, `SchemaError` → INTERNAL_ERROR
+  - Structured response envelope: `{"version": 1, "ok": true/false, "data": ..., "error": {"code": ..., "message": ...}}`
+  - Handler contract enforced: `handler(**kwargs) -> dict | Awaitable[dict]`
+  - `_create_handler()` — replaces standalone `_make_tool_handler`, creates FastMCP handler closures that route through `_dispatch`
+  - `ToolExecutionError(TOOL_NOT_FOUND)` for unknown tool names
+
+- **ChronicleModule.get_tool_defs()** (`modules/chronicle/module.py`): 3 MCP tools:
+  - `chronicle_record` — record an activity event (source, event_type, details)
+  - `chronicle_query` — query events with optional source/type/time/limit filters
+  - `chronicle_stats` — aggregate statistics over all recorded events
+
+- **GuardianModule.get_tool_defs()** (`modules/guardian/module.py`): 4 MCP tools:
+  - `guardian_diagnostics` — diagnostics for a specific module
+  - `guardian_all_diagnostics` — all tracked diagnostics snapshot
+  - `guardian_clear_diagnostics` — clear single module diagnostics
+  - `guardian_clear_all` — clear all diagnostics
+
+- **Tool Execution Error Codes** (`core/exceptions.py`): `VALIDATION_ERROR`, `TOOL_NOT_FOUND`, `HANDLER_NOT_FOUND`, `MODULE_ERROR`, `INTERNAL_ERROR` — all mappable to structured error responses
+
+- **`AgentAdapterManager`** (`adapters/manager.py`): Lifecycle coordinator bridging Engine + Adapter. Starts adapter, starts engine, discovers and registers module tools, handles stop in reverse order. Zero business logic — pure orchestration.
+
+- **Handler Validation** (fail-fast at registration): Existence check, private-method rejection (`_` prefix), callable type check — all raised as `ToolExecutionError(HANDLER_NOT_FOUND)` before any tool is registered.
+
+- **Dependency**: `jsonschema>=4.20` for JSON Schema validation at dispatch time.
+
+### Architecture
+
+- Dispatch is a plain method on `OpenCodeAdapter` — FastMCP closure only calls `self._dispatch(name, kwargs)`. Zero FastMCP leak.
+- Error responses are always dicts — FastMCP expects JSON-serializable return values.
+- `_ToolSlot` stores only `handler` + `schema` — no module reference stored.
+- `AgentAdapterManager` does NOT import FastMCP or any concrete adapter — dependency injection from `get_adapter("opencode")`.
+- `get_tool_defs()` imports `ToolDef` via lazy import in all three modules (chronicle, guardian, vision) — no eager adapter coupling.
+- CLI `mcp.py` routes through `AgentAdapterManager` — no direct adapter calls outside `stop()`.
+
+### Changed
+
+- `AgentAdapter.register_module_tools()` signature: added `module: Any` parameter for handler resolution.
+- `_MockModule` test handlers return `dict` (not `str`) to match the handler contract.
+
+### Removed
+
+- Standalone `_make_tool_handler()` stub — replaced by `OpenCodeAdapter._create_handler()`.
+
+---
+
 ## [0.6.0-alpha] — 2026-07-13
 
 ### Added

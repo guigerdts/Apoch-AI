@@ -1,9 +1,10 @@
 [project]
 name = "apoch-ai"
-version = "0.4.0-alpha"
+version = "0.7.0-alpha"
 description = "Agent-agnostic Python framework for AI-assisted development workflows"
 requires-python = ">=3.13"
 dependencies = [
+    "jsonschema>=4.20",
     "mcp>=1.28.1",
     "pydantic>=2.13.4",
     "pyyaml>=6.0",

@@ -337,3 +337,55 @@ class TestStopClearsDiagnostics:
         assert len(guardian.all_diagnostics()) == 1
         await guardian.stop()
         assert guardian.all_diagnostics() == {}
+
+
+class TestGuardianGetToolDefs:
+    """GuardianModule.get_tool_defs() returns correct MCP tool definitions."""
+
+    def test_returns_list_of_tool_defs(self) -> None:
+        """get_tool_defs returns a list with 4 entries."""
+        from apoch.modules.guardian.module import GuardianModule
+
+        mod = GuardianModule({})
+        defs = mod.get_tool_defs()
+        assert len(defs) == 4
+
+    def test_each_tool_def_has_required_attributes(self) -> None:
+        """Each ToolDef has name, description, input_schema, handler_name."""
+        from apoch.adapters.base import ToolDef
+        from apoch.modules.guardian.module import GuardianModule
+
+        mod = GuardianModule({})
+        for tool in mod.get_tool_defs():
+            assert isinstance(tool, ToolDef)
+            assert tool.name
+            assert tool.description
+            assert isinstance(tool.input_schema, dict)
+            assert tool.handler_name
+
+    def test_handler_names_exist_as_public_methods(self) -> None:
+        """Every handler_name corresponds to a public callable method on the module."""
+        from apoch.modules.guardian.module import GuardianModule
+
+        mod = GuardianModule({})
+        for tool in mod.get_tool_defs():
+            handler = getattr(mod, tool.handler_name, None)
+            assert handler is not None, (
+                f"Handler '{tool.handler_name}' not found on GuardianModule"
+            )
+            assert callable(handler), (
+                f"Handler '{tool.handler_name}' is not callable"
+            )
+            assert not tool.handler_name.startswith("_")
+
+    def test_input_schemas_are_valid_json_schema(self) -> None:
+        """Each input_schema has a valid type and properties structure."""
+        from apoch.modules.guardian.module import GuardianModule
+
+        mod = GuardianModule({})
+        for tool in mod.get_tool_defs():
+            schema = tool.input_schema
+            assert "type" in schema
+            assert schema["type"] == "object"
+            assert "properties" in schema
+            assert isinstance(schema["properties"], dict)

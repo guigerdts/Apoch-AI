@@ -11,15 +11,35 @@ Every public method is designed to be:
 
 from __future__ import annotations
 
+import inspect
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from jsonschema import validate as js_validate
+from jsonschema.exceptions import SchemaError, ValidationError
+
 from apoch.adapters.base import AgentAdapter, HealthStatus, ToolDef
+from apoch.core.exceptions import ToolExecutionError
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _ToolSlot:
+    """Internal slot tracking a registered tool's resolved handler.
+
+    Attributes:
+        handler: The resolved callable (``getattr(module, handler_name)``).
+                 Must return ``dict | Awaitable[dict]``.
+        schema:  The ``input_schema`` from the tool's ``ToolDef``.
+    """
+
+    handler: Callable[..., Any]
+    schema: dict[str, Any]
 
 
 @dataclass
@@ -46,7 +66,7 @@ class OpenCodeAdapter(AgentAdapter):
 
         adapter = OpenCodeAdapter(config={"name": "apoch"})
         await adapter.start()
-        await adapter.register_module_tools("chronicle", [...])
+        await adapter.register_module_tools("chronicle", module_instance, [...])
         status = await adapter.health()
         await adapter.stop()
     """
@@ -58,6 +78,8 @@ class OpenCodeAdapter(AgentAdapter):
         self._module_tools: dict[str, list[ToolDef]] = {}
         # Track registered tool names to detect duplicates across modules
         self._registered_names: set[str] = set()
+        # Runtime tool registry: tool_name → _ToolSlot
+        self._tool_registry: dict[str, _ToolSlot] = {}
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -88,6 +110,7 @@ class OpenCodeAdapter(AgentAdapter):
         self._started_at = None
         self._module_tools.clear()
         self._registered_names.clear()
+        self._tool_registry.clear()
         logger.info("OpenCode gateway stopped")
 
     # ------------------------------------------------------------------
@@ -108,12 +131,18 @@ class OpenCodeAdapter(AgentAdapter):
     # Tool registration
     # ------------------------------------------------------------------
 
-    async def register_module_tools(self, module_name: str, tools: list[ToolDef]) -> None:
-        """Register *tools* belonging to *module_name*.
+    async def register_module_tools(
+        self,
+        module_name: str,
+        module: Any,
+        tools: list[ToolDef],
+    ) -> None:
+        """Register *tools* belonging to *module_name* with the gateway.
 
-        If a tool name conflicts with a previously registered tool from
-        another module, the new tool is prefixed with ``{module_name}_``
-        and a warning is logged.
+        For each ``ToolDef``, resolves ``handler_name`` on *module* via
+        ``getattr``.  If the handler does not exist, is private (``_``-prefixed),
+        or is not callable, raises ``ToolExecutionError(HANDLER_NOT_FOUND)``
+        and the tool is NOT registered — fail-fast at startup.
         """
         if self._server is None:
             logger.warning("Cannot register tools: gateway not started")
@@ -123,6 +152,9 @@ class OpenCodeAdapter(AgentAdapter):
         registered: list[str] = []
 
         for tool in tools:
+            # Validate handler_name exists and is callable (fail-fast).
+            self._validate_handler(module, tool)
+
             final_name = tool.name
             if tool.name in self._registered_names:
                 final_name = f"{module_name}_{tool.name}"
@@ -134,12 +166,18 @@ class OpenCodeAdapter(AgentAdapter):
                 )
 
             self._server.add_tool(
-                _make_tool_handler(final_name, tool.description),
+                self._create_handler(final_name, tool.description),
                 name=final_name,
                 description=tool.description,
             )
             self._registered_names.add(final_name)
             self._module_tools[module_name].append(tool)
+
+            # Store the resolved slot for dispatch (PR4B).
+            self._tool_registry[final_name] = _ToolSlot(
+                handler=getattr(module, tool.handler_name),
+                schema=tool.input_schema,
+            )
             registered.append(final_name)
 
         if registered:
@@ -149,6 +187,114 @@ class OpenCodeAdapter(AgentAdapter):
                 module_name,
                 ", ".join(registered),
             )
+
+    def _validate_handler(self, module: Any, tool: ToolDef) -> None:
+        """Validate that *tool.handler_name* is a public callable on *module*.
+
+        Raises:
+            ToolExecutionError: If the handler is invalid.
+        """
+        name = tool.handler_name
+        if name.startswith("_"):
+            raise ToolExecutionError(
+                code=ToolExecutionError.HANDLER_NOT_FOUND,
+                message=f"Handler '{name}' is private (starts with '_'). "
+                f"Only public methods are allowed as tool handlers.",
+            )
+        handler = getattr(module, name, None)
+        if handler is None:
+            raise ToolExecutionError(
+                code=ToolExecutionError.HANDLER_NOT_FOUND,
+                message=f"Handler '{name}' not found on module "
+                f"'{type(module).__name__}'. Ensure the method exists "
+                f"and is spelled correctly.",
+            )
+        if not callable(handler):
+            raise ToolExecutionError(
+                code=ToolExecutionError.HANDLER_NOT_FOUND,
+                message=f"Handler '{name}' on module "
+                f"'{type(module).__name__}' is not callable.",
+            )
+
+    # ------------------------------------------------------------------
+    # Tool dispatch
+    # ------------------------------------------------------------------
+
+    async def _dispatch(self, tool_name: str, kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Resolve *tool_name*, validate kwargs, and dispatch to the handler.
+
+        Returns the structured response envelope::
+
+            {"version": 1, "ok": True, "data": <handler_result>}
+            {"version": 1, "ok": False, "error": {"code": "...", "message": "..."}}
+        """
+        slot = self._tool_registry.get(tool_name)
+        if slot is None:
+            return {
+                "version": 1,
+                "ok": False,
+                "error": {
+                    "code": ToolExecutionError.TOOL_NOT_FOUND,
+                    "message": f"Tool '{tool_name}' not found",
+                },
+            }
+
+        # Validate kwargs against JSON Schema.
+        try:
+            js_validate(instance=kwargs, schema=slot.schema)
+        except ValidationError as exc:
+            return {
+                "version": 1,
+                "ok": False,
+                "error": {
+                    "code": ToolExecutionError.VALIDATION_ERROR,
+                    "message": str(exc),
+                },
+            }
+        except SchemaError as exc:
+            return {
+                "version": 1,
+                "ok": False,
+                "error": {
+                    "code": ToolExecutionError.INTERNAL_ERROR,
+                    "message": f"Schema error for '{tool_name}': {exc}",
+                },
+            }
+
+        # Dispatch — sync or async.
+        try:
+            if inspect.iscoroutinefunction(slot.handler):
+                result = await slot.handler(**kwargs)
+            else:
+                result = slot.handler(**kwargs)
+        except ToolExecutionError as exc:
+            return {
+                "version": 1,
+                "ok": False,
+                "error": {"code": exc.code, "message": exc.message},
+            }
+        except Exception as exc:
+            logger.exception("Tool '%s' raised unexpected error", tool_name)
+            return {
+                "version": 1,
+                "ok": False,
+                "error": {
+                    "code": ToolExecutionError.INTERNAL_ERROR,
+                    "message": f"{type(exc).__name__}: {exc}",
+                },
+            }
+
+        return {"version": 1, "ok": True, "data": result}
+
+    def _create_handler(self, name: str, description: str) -> Any:
+        """Create a FastMCP tool handler that routes through ``_dispatch``."""
+
+        async def _handler(**kwargs: Any) -> dict[str, Any]:
+            return await self._dispatch(name, kwargs)
+
+        _handler.__name__ = name
+        _handler.__doc__ = description
+        return _handler
 
     # ------------------------------------------------------------------
     # Install / Uninstall (synchronous config management)
@@ -224,23 +370,3 @@ class OpenCodeAdapter(AgentAdapter):
         latest.unlink()
         logger.info("Uninstall complete — restored from: %s", latest)
 
-
-# ------------------------------------------------------------------
-# Internal helpers
-# ------------------------------------------------------------------
-
-
-def _make_tool_handler(name: str, description: str) -> Any:
-    """Create a no-op tool handler for the given *name*.
-
-    In v1 these handlers are placeholder stubs — real module tool
-    dispatch will be wired in PR4–PR6.
-    """
-
-    async def _handler(**kwargs: Any) -> str:
-        return f"{name}: called with {kwargs}"
-
-    # Attach metadata for FastMCP's introspection
-    _handler.__name__ = name
-    _handler.__doc__ = description
-    return _handler

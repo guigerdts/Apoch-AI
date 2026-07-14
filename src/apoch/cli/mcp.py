@@ -1,7 +1,7 @@
 """apoch mcp — manage the MCP gateway lifecycle.
 
 Spec: agent-adapter §Gateway Health
-Architecture: CLI delegates to adapter.start/stop — thin facade only.
+Architecture: CLI delegates to AgentAdapterManager — thin facade only.
 """
 
 from __future__ import annotations
@@ -10,18 +10,27 @@ import asyncio
 
 import typer
 
+from apoch.adapters.manager import AgentAdapterManager
 from apoch.adapters.registry import get_adapter
+from apoch.core.registry import ModuleRegistry
 
 cli_app = typer.Typer()
 
 
+def _build_manager() -> AgentAdapterManager:
+    """Build an AgentAdapterManager with the default adapter and registry."""
+    adapter = get_adapter("opencode")
+    registry = ModuleRegistry(config={})
+    return AgentAdapterManager(adapter=adapter, registry=registry)
+
+
 @cli_app.command()
 def start() -> None:
-    """Start the MCP gateway."""
-    adapter = get_adapter("opencode")
+    """Start the MCP gateway with module tool registration."""
+    manager = _build_manager()
     try:
-        asyncio.run(adapter.start())
-        status = asyncio.run(adapter.health())
+        asyncio.run(manager.start())
+        status = asyncio.run(manager._adapter.health())
         if status.healthy:
             typer.echo("✓ MCP gateway started")
         else:
@@ -49,8 +58,12 @@ def restart() -> None:
     adapter = get_adapter("opencode")
     try:
         asyncio.run(adapter.stop())
-        asyncio.run(adapter.start())
-        status = asyncio.run(adapter.health())
+    except Exception:
+        pass  # May not be running — that's fine.
+    manager = _build_manager()
+    try:
+        asyncio.run(manager.start())
+        status = asyncio.run(manager._adapter.health())
         if status.healthy:
             typer.echo("✓ MCP gateway restarted")
         else:

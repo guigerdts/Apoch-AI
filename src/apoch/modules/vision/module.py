@@ -319,6 +319,7 @@ class VisionModule(Module):
                         },
                     },
                 },
+                handler_name="module_state",
             ),
             ToolDef(
                 name="vision_config",
@@ -332,6 +333,7 @@ class VisionModule(Module):
                         },
                     },
                 },
+                handler_name="module_config",
             ),
             ToolDef(
                 name="vision_logs",
@@ -349,11 +351,13 @@ class VisionModule(Module):
                         },
                     },
                 },
+                handler_name="recent",
             ),
             ToolDef(
                 name="vision_system",
                 description="Return process-level health and environment info.",
                 input_schema={"type": "object", "properties": {}},
+                handler_name="system_info",
             ),
         ]
 

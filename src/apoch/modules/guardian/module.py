@@ -132,5 +132,62 @@ class GuardianModule(Module):
         """Remove all diagnostics entries."""
         self._diagnostics.clear()
 
+    # ------------------------------------------------------------------
+    # MCP tool definitions
+    # ------------------------------------------------------------------
+
+    def get_tool_defs(self) -> list:
+        """Return MCP tool definitions for this module.
+
+        Returns:
+            List of 4 ``ToolDef`` entries for diagnostics inspection.
+        """
+        from apoch.adapters.base import ToolDef  # noqa: PLC0415
+
+        return [
+            ToolDef(
+                name="guardian_diagnostics",
+                description="Return diagnostics for a specific module.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "module_name": {
+                            "type": "string",
+                            "description": "Name of the module to inspect.",
+                        },
+                    },
+                    "required": ["module_name"],
+                },
+                handler_name="diagnostics",
+            ),
+            ToolDef(
+                name="guardian_all_diagnostics",
+                description="Return diagnostics for all tracked modules.",
+                input_schema={"type": "object", "properties": {}},
+                handler_name="all_diagnostics",
+            ),
+            ToolDef(
+                name="guardian_clear_diagnostics",
+                description="Clear diagnostics for a specific module.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "module_name": {
+                            "type": "string",
+                            "description": "Name of the module to clear.",
+                        },
+                    },
+                    "required": ["module_name"],
+                },
+                handler_name="clear_diagnostics",
+            ),
+            ToolDef(
+                name="guardian_clear_all",
+                description="Clear all diagnostics entries.",
+                input_schema={"type": "object", "properties": {}},
+                handler_name="clear_all_diagnostics",
+            ),
+        ]
+
 
 __all__ = ["GuardianModule"]

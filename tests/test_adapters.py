@@ -64,20 +64,19 @@ class TestToolDef:
         assert is_dataclass(ToolDef)
 
     def test_tool_def_fields(self) -> None:
-        """ToolDef has name, description, input_schema fields."""
+        """ToolDef has name, description, input_schema, handler_name fields."""
         from apoch.adapters.base import ToolDef
 
-        t = ToolDef(name="list", description="List items", input_schema={"type": "object"})
+        t = ToolDef(
+            name="list",
+            description="List items",
+            input_schema={"type": "object"},
+            handler_name="list_items",
+        )
         assert t.name == "list"
         assert t.description == "List items"
         assert t.input_schema == {"type": "object"}
-
-    def test_tool_def_default_schema(self) -> None:
-        """ToolDef.input_schema defaults to empty dict."""
-        from apoch.adapters.base import ToolDef
-
-        t = ToolDef(name="ping", description="Ping")
-        assert t.input_schema == {}
+        assert t.handler_name == "list_items"
 
 
 class TestAgentAdapterABC:
@@ -113,7 +112,7 @@ class TestAgentAdapterABC:
             class _BadAdapter(AgentAdapter):  # type: ignore[abstract]
                 async def start(self) -> None: ...
                 async def stop(self) -> None: ...
-                async def register_module_tools(self, module_name: str, tools: list) -> None: ...
+                async def register_module_tools(self, module_name: str, module: object, tools: list) -> None: ...  # noqa: ARG002
 
             _BadAdapter(config={})
 
@@ -125,7 +124,7 @@ class TestAgentAdapterABC:
             async def start(self) -> None: ...
             async def stop(self) -> None: ...
             async def health(self): ...
-            async def register_module_tools(self, module_name: str, tools: list) -> None: ...
+            async def register_module_tools(self, module_name: str, module: object, tools: list) -> None: ...  # noqa: ARG002
 
         adapter = _GoodAdapter(config={})
         assert isinstance(adapter, AgentAdapter)
@@ -140,7 +139,7 @@ class TestAgentAdapterABC:
             async def start(self) -> None: ...
             async def stop(self) -> None: ...
             async def health(self): ...
-            async def register_module_tools(self, module_name: str, tools: list) -> None: ...
+            async def register_module_tools(self, module_name: str, module: object, tools: list) -> None: ...  # noqa: ARG002
 
         adapter = _TestAdapter(config={})
         assert asyncio.iscoroutinefunction(adapter.start)

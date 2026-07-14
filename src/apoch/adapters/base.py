@@ -13,7 +13,7 @@ Design constraints:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -40,11 +40,15 @@ class ToolDef:
         name:         Tool name (unique within the module namespace).
         description:  Human-readable description of the tool's purpose.
         input_schema: JSON Schema dict describing the expected parameters.
+        handler_name: Name of the public method on the module instance that
+                      implements this tool.  Must be resolvable via
+                      ``getattr(module, handler_name)`` at registration time.
     """
 
     name: str
     description: str
-    input_schema: dict[str, Any] = field(default_factory=dict)
+    input_schema: dict[str, Any]
+    handler_name: str
 
 
 class AgentAdapter(ABC):
@@ -79,8 +83,13 @@ class AgentAdapter(ABC):
         """Return the current health status of the gateway process."""
 
     @abstractmethod
-    async def register_module_tools(self, module_name: str, tools: list[ToolDef]) -> None:
+    async def register_module_tools(
+        self, module_name: str, module: Any, tools: list[ToolDef]
+    ) -> None:
         """Register *tools* belonging to *module_name* with the gateway.
+
+        *module* is the module instance used to resolve ``handler_name``
+        on each ``ToolDef`` via ``getattr(module, tool.handler_name)``.
 
         If a tool name conflicts with an already-registered tool, the
         adapter MUST prefix the tool name (e.g. ``module_name_tool``)

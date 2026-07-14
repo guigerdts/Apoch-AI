@@ -36,6 +36,35 @@ class StorageError(ApochError):
     """Raised when a storage operation (read/write/delete) fails."""
 
 
+class ToolExecutionError(ApochError):
+    """Raised when an MCP tool dispatch or registration fails.
+
+    Attributes:
+        code:    Machine-readable error code (VALIDATION_ERROR, TOOL_NOT_FOUND,
+                 HANDLER_NOT_FOUND, MODULE_ERROR, INTERNAL_ERROR).
+        message: Human-readable description.
+        details: Optional dict with additional context (e.g. traceback).
+    """
+
+    # Error codes
+    VALIDATION_ERROR = "VALIDATION_ERROR"
+    TOOL_NOT_FOUND = "TOOL_NOT_FOUND"
+    HANDLER_NOT_FOUND = "HANDLER_NOT_FOUND"
+    MODULE_ERROR = "MODULE_ERROR"
+    INTERNAL_ERROR = "INTERNAL_ERROR"
+
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        details: dict | None = None,
+    ) -> None:
+        super().__init__(f"[{code}] {message}")
+        self.code = code
+        self.message = message
+        self.details = details or {}
+
+
 __all__ = [
     "ApochError",
     "ConfigError",
@@ -44,4 +73,5 @@ __all__ = [
     "StateTransitionError",
     "OpenCodeConfigError",
     "StorageError",
+    "ToolExecutionError",
 ]
