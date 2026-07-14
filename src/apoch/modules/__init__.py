@@ -9,4 +9,4 @@ point group in ``pyproject.toml``.
 
 from __future__ import annotations
 
-__all__ = ["chronicle"]
+__all__ = ["chronicle", "pulse"]
