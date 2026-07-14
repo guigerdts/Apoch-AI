@@ -4,7 +4,7 @@ Enhancement framework for AI coding agents.
 Augments OpenCode and other agents with intelligent modules:
 memory, context management, code intelligence, observability, integrations.
 Stack: Python. Cross-platform. Developer-first.
-**Estado:** v0.7.0-alpha — Infrastructure Roadmap complete. Now in Product Features phase.
+**Estado:** v0.7.0-alpha — 3 módulos implementados (Chronicle, Guardian, Vision).
 
 # Apoch-AI
 
@@ -41,6 +41,8 @@ Version 1 only targets OpenCode.
 
 The architecture MUST remain agent agnostic.
 
+Apoch-AI is not an AI coding agent. It is an Engineering Intelligence Layer that augments coding agents with persistent memory, engineering governance, runtime observability, performance intelligence, continuous optimization, and architectural reasoning — capabilities that coding agents are not designed to provide persistently across sessions and projects.
+
 ---
 
 # 3. Philosophy
@@ -54,12 +56,15 @@ Instead:
 - Extend
 - Observe
 - Improve
+- Intelligence
 
-Every feature implemented by Apoch-AI must provide value that the agent does not already provide.
+Every feature implemented by Apoch-AI must provide value that the agent does not already provide. This includes capabilities the agent structurally cannot maintain across sessions or projects — such as persistent project memory, architectural governance, and cross-session reasoning.
 
 ---
 
 # 4. Primary Goals
+
+These goals together deliver the Intelligence Layer vision described in §2 — not a feature framework, but a platform that provides persistent intelligence capabilities across sessions and agents.
 
 - Simple installation.
 - Native integration.
@@ -138,20 +143,26 @@ These are considered part of the platform.
 
 Apoch-AI introduces the following native modules.
 
-Status: ✅ Implemented — 🔄 Product iteration — ⏳ Pending
+Status: ✅ Implemented — 🔄 In progress — ⏳ Pending
 
-Chronicle ✅ `v0.3.0-alpha` → 🔄 PR5
+Each module covers one dimension of engineering intelligence corresponding to the six capabilities introduced in §2. Any module may be installed independently (Rule 006); together they form a complete Intelligence Layer. Chronicle provides institutional memory, Guardian enforces governance, Vision exposes observability, Pulse measures performance, Optimizer identifies improvements, and Oracle produces architectural recommendations.
+
+Chronicle ✅ `v0.3.0-alpha`
 
 Activity recording and timeline generation. SQLite-based event store with WAL,
-auto-prune, and dynamic filter queries. **PR5 adds**: filters, search, tags, time
-ranges, limits, ordering, metrics — making Chronicle the system's operational
-memory.
+auto-prune, and dynamic filter queries. Implements spec subset: event recording,
+persistent storage, query interface, retention/pruning.
 
-Guardian ✅ `v0.4.0-alpha` → 🔄 PR6
+Oracle ⏳
+
+Decision analysis and reasoning.
+
+Guardian ✅ `v0.4.0-alpha`
 
 Exception isolation and execution boundaries. Wraps module lifecycle calls
-with structured diagnostics capture. **PR6 adds**: health reports, dependency
-checks, startup verification, runtime status, recommendations.
+with structured diagnostics capture. Implements spec subset: exception boundaries,
+state tracking, post-failure diagnostics, graceful degradation. Timeouts and
+policy enforcement deferred to future releases.
 
 Vision ✅ `v0.6.0-alpha`
 
@@ -159,34 +170,37 @@ Full observability suite: structured NDJSON logging with rotation, ring buffer, 
 state/config introspection, system info (PID, memory, platform), degraded mode support,
 and optional Chronicle integration via duck-typed services.
 
+Pulse ⏳
+
+Performance benchmarking.
+
+Optimizer ⏳
+
+Context and token optimization.
+
 ---
 
 # 10. Roadmap
 
-## Infrastructure Roadmap (PR1–PR4) — ✅ COMPLETED
+Development follows the approved roadmap. Current progress:
 
-| Phase | Description | Version | Status |
-|-------|-------------|---------|--------|
-| Phase 0 | Foundation (project setup, uv, CI, testing) | — | ✅ |
-| PR1 | Core Engine (Module, Registry, Events, Config, Exceptions, CLI) | `v0.1.0` — `v0.2.0-alpha` | ✅ |
-| PR2 | OpenCode Integration (Adapter, MCP gateway, CLI lifecycle) | `v0.3.0-alpha` | ✅ |
-| PR3A | Chronicle Foundation — SQLite event store | `v0.4.0-alpha` | ✅ |
-| PR3B | Guardian Module — exception isolation, diagnostics | `v0.5.0-alpha` | ✅ |
-| PR3C-A | Vision Foundation — NDJSON logging, services | `v0.6.0-alpha` | ✅ |
-| PR3C-B | Vision Query APIs — introspection, system info | `v0.6.0-alpha` | ✅ |
-| PR4 | Agent Tool Dispatch Runtime — dispatch, validation, E2E gate | `v0.7.0-alpha` | ✅ |
+| Phase | Description | Status |
+|-------|-------------|--------|
+| Phase 0 | Foundation (project setup, uv, CI, testing) | ✅ Complete |
+| Phase 1 | Core (Engine, Module, Registry, Events, Config, Exceptions) | ✅ Complete — `v0.1.0` |
+| Phase 2 | OpenCode Integration (Adapter, CLI, opencode.json manager) | ✅ Complete — `v0.3.0-alpha` |
+| Phase 3 | Core Modules | 🔄 In progress |
+| | — PR3A: Chronicle Foundation | ✅ `v0.3.0-alpha` |
+| | — PR3B: Guardian Module | ✅ `v0.4.0-alpha` |
+| | — PR3C-A: Vision Foundation | ✅ `v0.5.0-alpha` |
+| | — PR3C-B: Vision Query APIs | ✅ `v0.6.0-alpha` |
+| | — Pulse, Optimizer, Oracle | ⏳ Pending |
+| Phase 4 | Ecosystem | ⏳ Pending |
+| Phase 5 | Stabilization | ⏳ Pending |
 
-## Product Features Roadmap (PR5+) — 🆕 Active
+The roadmap is considered frozen.
 
-| PR | Module | Focus | Goal |
-|----|--------|-------|------|
-| **PR5** | Chronicle | Product Features | Filters, search, tags, time ranges, limits, ordering, metrics |
-| **PR6** | Guardian | Runtime & Health | Health reports, dependency checks, runtime status, recommendations |
-| **PR7** | CLI | Unified Lifecycle | `apoch start\|stop\|status\|doctor` |
-| **PR8** | — | First Consumer | OpenCode workflows or agent — real usage drives refinements |
-
-**Principle**: Value first, infrastructure second. Every PR must answer:
-> "¿Qué hace que Apoch sea más útil mañana para un usuario?"
+Any modification requires explicit approval.
 
 ---
 
@@ -311,6 +325,8 @@ No experimental code should enter the main branch.
 ---
 
 # 15. Success Criteria
+
+Viewed through the Intelligence Layer lens, these criteria define a complete platform that delivers persistent intelligence across the development lifecycle — a coherent engineering intelligence platform rather than only a collection of independent capabilities.
 
 Version 1 is considered complete when:
 

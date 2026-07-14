@@ -75,6 +75,8 @@
 
 Proposal, specs (4), design, and tasks are archived alongside this report.
 
-## Infrastructure Roadmap — CLOSED
+## Status
 
-This archive closes the Infrastructure Roadmap (PR1–PR4). Development now transitions to the Product Features roadmap.
+PR4 completes the approved Phase 2 (OpenCode Integration) extension for tool dispatch.
+Development continues per the frozen Master Document roadmap: Phase 3 (Core Modules)
+with Pulse, Optimizer, Oracle pending; Phase 4 (Ecosystem); Phase 5 (Stabilization).
