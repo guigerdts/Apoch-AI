@@ -14,6 +14,7 @@
 - **OpenCode Adapter** — FastMCP gateway, tool dispatch, opencode.json management
 - **1,105 Tests** — Clean Ruff, `v0.7.0-alpha` tagged
 - **Test Suite** — Full coverage of all lifecycle methods, edge cases, and integration paths
+- **Documentation Completion** — 15 docs/ files covering user guide, developer guide, and reference, plus README hub
 
 ## 🔄 In Development
 
@@ -27,7 +28,6 @@
 
 | Item | Scope | Notes |
 |------|-------|-------|
-| Documentation Completion | Docs | Fill remaining gaps in developer and user docs |
 | Extended Agent Support | Agent Layer | Claude Code, Codex, Gemini CLI |
 | Persistent Configuration | CLI | Config file for user preferences |
 | CI/CD Pipeline | Infrastructure | GitHub Actions for tests, lint, build, release |
