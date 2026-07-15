@@ -27,7 +27,9 @@ vision = "apoch.modules.vision.module:VisionModule"
 # Third-party plugins register here
 
 [project.entry-points."apoch.stack.components"]
+context7 = "apoch.stack.components.context7:Context7Component"
 openspec = "apoch.stack.components.openspec:OpenSpecComponent"
+engram = "apoch.stack.components.engram:EngramComponent"
 
 [build-system]
 requires = ["setuptools"]
