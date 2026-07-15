@@ -7,6 +7,10 @@ Get Apoch-AI up and running in five minutes.
 ## 1. Install
 
 ```bash
+# Install uv (Python package manager)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Clone and sync
 git clone https://github.com/guigerdts/Apoch-AI.git
 cd Apoch-AI
 uv sync

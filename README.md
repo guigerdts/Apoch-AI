@@ -22,7 +22,10 @@ Apoch-AI is **not** a coding agent, an LLM, a model provider, or an IDE. It is a
 ## Quick Start
 
 ```bash
-# Install from source
+# Install uv (Python package manager)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Clone and install
 git clone https://github.com/guigerdts/Apoch-AI.git
 cd Apoch-AI
 uv sync
@@ -161,6 +164,9 @@ See [Roadmap](docs/roadmap.md) for the full development plan.
 | **License** | MIT |
 
 ```bash
+# Install uv (Python package manager)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # Setup
 git clone https://github.com/guigerdts/Apoch-AI.git
 cd Apoch-AI

@@ -29,6 +29,7 @@ No. Apoch-AI is a CLI framework and Python package. It has no graphical interfac
 
 ```bash
 # ✅ This works now:
+curl -LsSf https://astral.sh/uv/install.sh | sh    # install uv first
 git clone https://github.com/guigerdts/Apoch-AI.git
 cd Apoch-AI
 uv sync

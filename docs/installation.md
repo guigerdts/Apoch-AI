@@ -6,19 +6,25 @@
 
 ## Prerequisites
 
-| Requirement | Version | Check |
-|-------------|---------|-------|
-| Python | >= 3.13 | `python --version` |
-| uv | latest | `uv --version` |
-| Node.js | >= 20.19.0 | `node --version` (for OpenSpec, CodeGraph) |
-| npm | bundled with Node | `npm --version` |
-| Homebrew | latest | `brew --version` (macOS/Linux, for Engram) |
+| Requirement | Version | Install | Check |
+|-------------|---------|---------|-------|
+| Python | >= 3.13 | System package manager | `python --version` |
+| uv | latest | `curl -LsSf https://astral.sh/uv/install.sh \| sh` | `uv --version` |
+| Node.js | >= 20.19.0 | `apt install nodejs` or `brew install node` | `node --version` |
+| npm | bundled with Node | (comes with Node) | `npm --version` |
+| Homebrew | latest | `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"` | `brew --version` |
 
 ## Install from Source (Current)
 
 ```bash
+# 1. Install uv (if you don't have it)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 2. Clone the repo
 git clone https://github.com/guigerdts/Apoch-AI.git
 cd Apoch-AI
+
+# 3. Sync dependencies
 uv sync
 ```
 
