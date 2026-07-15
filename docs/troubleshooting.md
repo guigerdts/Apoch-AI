@@ -164,3 +164,23 @@ uv run pytest tests/stack/ -v
 ```
 
 ---
+
+## Termux — Native Extension Not Found
+
+**Symptom:** `ModuleNotFoundError: No module named 'rpds.rpds'` (or other `.so` / native module errors).
+
+**Cause:** Some Python packages (`rpds-py`, `orjson`, `cryptography`, etc.) ship pre-compiled wheels that don't support `aarch64-linux-android`. The wheel installs the pure-Python wrapper but skips the native binary.
+
+**Fix:** Reinstall the failing package from source:
+
+```bash
+# Install Rust compiler (needed to build some native extensions)
+pkg install rust
+
+# Force rebuild from source
+pip install --force-reinstall --no-binary :all: rpds-py
+```
+
+If the error is about a different package (e.g. `orjson`, `cryptography`), replace `rpds-py` with the package name from the error.
+
+---
