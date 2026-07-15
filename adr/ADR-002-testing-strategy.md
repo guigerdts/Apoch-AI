@@ -1,7 +1,7 @@
 # ADR-002 — Testing Strategy
 
 **Date:** 2026-07-15
-**Status:** Proposed
+**Status:** Approved
 **Context:** Core Stack is frozen, four adapters implemented (OpenSpec, Engram, Context7, CodeGraph), documentation complete. Milestone 3 (Integration & Release) requires a defined testing strategy before any E2E code is written.
 
 ---
@@ -91,7 +91,27 @@ Tests without a marker default to `unit` behaviour wherever possible.
 - Run manually or on demand in CI — not part of the default `pytest` suite.
 - Results are informational: track regressions, no pass/fail threshold.
 
-### 4.5 Destructive operations policy
+### 4.5 E2E skip criteria
+
+E2E tests MUST distinguish between three scenarios:
+
+| Scenario | Result | Rationale |
+|----------|--------|-----------|
+| Required tool not installed (`shutil.which` returns `None`) | **SKIP** (`pytest.skip`) | Environment choice, not a regression. User may not have the tool. |
+| Tool is installed but fails during test | **FAIL** | The adapter's integration with the real tool is broken. |
+| Infrastructure error (runner misconfiguration, network timeout on health check, missing system dependency) | **XFAIL** or **SKIP with documented reason** | Not the adapter's fault. Documented to avoid noise in reports. |
+
+This avoids ambiguity in CI: a missing tool is always `SKIP`, never `FAIL` or `XPASS`.
+
+### 4.6 Test isolation
+
+- Every E2E test MUST be **independent and order-independent**.
+- No test may depend on state created by a previous test.
+- Each test MUST clean up any temporary state it generates (temp files, environment variables, config overrides).
+- Tests MAY use `tmp_path` (pytest built-in fixture) for isolated filesystem access.
+- Tests MUST NOT write to `~/.config/apoch/`, `~/.local/share/apoch/`, or any user-global path — only to `tmp_path` or explicitly managed sandbox directories.
+
+### 4.7 Destructive operations policy
 
 - `install()` and `uninstall()` are **destructive operations**.
 - They MUST NEVER execute in any test that runs on a developer's machine.
