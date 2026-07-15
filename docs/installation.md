@@ -24,12 +24,15 @@ uv sync
 
 This creates a virtual environment at `.venv/` and installs all dependencies.
 
-## Install from PyPI (When Published)
+## Install from PyPI — ⚠️ Not Yet Available
+
+> **Apoch-AI has NOT been published to PyPI yet.**  
+> The only installation method is [from source](#install-from-source).  
+> This section documents the future intent — skip it for now.
 
 ```bash
-pip install apoch-ai
-# or
-uv pip install apoch-ai
+pip install apoch-ai        # ⛔ won't work until published
+uv pip install apoch-ai     # ⛔ won't work until published
 ```
 
 ## Verify Installation

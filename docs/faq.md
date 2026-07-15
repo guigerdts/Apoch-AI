@@ -24,12 +24,17 @@ No. Apoch-AI is a CLI framework and Python package. It has no graphical interfac
 
 ### How do I install Apoch-AI?
 
+> **Apoch-AI has NOT been published to PyPI yet.**  
+> Use the source installation below.
+
 ```bash
-pip install apoch-ai          # when published on PyPI
-# or from source
+# ✅ This works now:
 git clone https://github.com/guigerdts/Apoch-AI.git
 cd Apoch-AI
 uv sync
+
+# ⛔ This won't work yet:
+# pip install apoch-ai
 ```
 
 ### What are the prerequisites?
