@@ -1,0 +1,48 @@
+# Coverage reporting — PR12 staging
+#
+# Runs after tests pass on main. Generates XML coverage report and
+# uploads to Codecov (or alternative). Non-blocking — informational only.
+
+name: Coverage
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  UV_SYSTEM_PYTHON: 1
+
+jobs:
+  coverage:
+    name: Coverage report
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Sync dependencies
+        run: uv sync --frozen
+
+      - name: Run tests with coverage
+        run: |
+          uv run pytest -m "not e2e" --cov=src/apoch --cov-report=xml --cov-report=term --junit-xml=junit.xml
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-test-results
+          path: junit.xml

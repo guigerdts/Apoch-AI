@@ -1,0 +1,148 @@
+# CI/CD Matrix — PR11
+#
+# Runs on every push to main and every PR targeting main.
+# Three-phase pipeline: Lint → Test (matrix) → E2E (matrix).
+#
+# Per ADR-002:
+#   - E2E tools install only in ephemeral CI runners
+#   - Local E2E tests SKIP when tools are absent (is_ci() guard)
+#   - Destructive tests (install/uninstall) run only when is_ci() == True
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  UV_SYSTEM_PYTHON: 1
+
+jobs:
+  # ── Lint ────────────────────────────────────────────────────────────
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Sync dependencies
+        run: uv sync --frozen
+
+      - name: Run Ruff
+        run: uv run ruff check
+
+  # ── Unit + Integration (no E2E) ────────────────────────────────────
+  test:
+    name: Test (${{ matrix.os }})
+    needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Sync dependencies
+        run: uv sync --frozen
+
+      - name: Run unit + integration tests
+        run: uv run pytest -m "not e2e" -v --tb=short --junit-xml=junit.xml
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.os }}
+          path: junit.xml
+
+  # ── E2E (real tool validation) ─────────────────────────────────────
+  e2e:
+    name: E2E (${{ matrix.os }})
+    needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Sync dependencies
+        run: uv sync --frozen
+
+      - name: Install E2E tools (npm)
+        run: |
+          npm install -g @fission-ai/openspec@latest
+          npm install -g ctx7
+          npm install -g @colbymchenry/codegraph
+
+      - name: Install Engram (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          curl -sL "https://github.com/Gentleman-Programming/engram/releases/download/v1.19.0/engram_1.19.0_linux_amd64.tar.gz" \
+            | tar xz -C /usr/local/bin engram
+
+      - name: Install Engram (macOS)
+        if: runner.os == 'macOS'
+        run: brew install gentleman-programming/tap/engram
+
+      - name: Install Engram (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          curl -sL "https://github.com/Gentleman-Programming/engram/releases/download/v1.19.0/engram_1.19.0_windows_amd64.zip" -o engram.zip
+          Expand-Archive -Path engram.zip -DestinationPath "$env:USERPROFILE\engram" -Force
+          echo "$env:USERPROFILE\engram" >> $env:GITHUB_PATH
+
+      - name: Verify tool versions
+        run: |
+          openspec --version
+          engram version
+          ctx7 --version
+          codegraph --version
+
+      - name: Run E2E tests
+        run: uv run pytest -m e2e -v --tb=short --junit-xml=junit-e2e.xml
+
+      - name: Upload E2E results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-results-${{ matrix.os }}
+          path: junit-e2e.xml
+
+      - name: Upload logs
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-logs-${{ matrix.os }}
+          path: |
+            pytest.log
+            ~/.apoch/*.log
+          continue-on-error: true
