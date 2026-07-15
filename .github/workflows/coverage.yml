@@ -1,7 +1,10 @@
-# Coverage reporting — PR12 staging
+# Coverage — PR12
 #
-# Runs after tests pass on main. Generates XML coverage report and
-# uploads to Codecov (or alternative). Non-blocking — informational only.
+# Generates XML + HTML coverage reports, enforces thresholds:
+#   - ≥80% global
+#   - ≥90% for src/apoch/stack/
+#
+# Runs after tests pass on main. Non-blocking — informational only.
 
 name: Coverage
 
@@ -31,13 +34,25 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          uv run pytest -m "not e2e" --cov=src/apoch --cov-report=xml --cov-report=term --junit-xml=junit.xml
+          uv run pytest -m "not e2e" \
+            --cov=src/apoch \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=term-missing \
+            --junit-xml=junit.xml
 
-      - name: Upload coverage artifact
+      - name: Upload HTML report
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: coverage-report
+          name: htmlcov
+          path: htmlcov/
+
+      - name: Upload XML report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-xml
           path: coverage.xml
 
       - name: Upload test results

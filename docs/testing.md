@@ -97,12 +97,28 @@ No `@pytest.mark.asyncio` decorator needed — auto-mode handles it.
 
 ## Coverage
 
+### Running Locally
+
 ```bash
-uv run pytest --cov=src/apoch          # Coverage report
-uv run pytest --cov=src/apoch --cov-report=html  # HTML report
+# Terminal report with missing lines
+uv run pytest -m "not e2e" --cov=src/apoch --cov-report=term-missing
+
+# HTML report (view in browser: open htmlcov/index.html)
+uv run pytest -m "not e2e" --cov=src/apoch --cov-report=html
+
+# XML report (CI artifact)
+uv run pytest -m "not e2e" --cov=src/apoch --cov-report=xml
 ```
 
-Coverage threshold: 80% (enforced by SDD methodology).
+### Thresholds (PR12)
+
+| Scope | Threshold | Current |
+|-------|-----------|---------|
+| **Global** (`src/apoch/`) | ≥80% | 91.0% |
+| **Stack** (`src/apoch/stack/`) | ≥90% | 96.6% |
+
+Thresholds are documented but not yet enforced in CI as a hard gate.
+Use the commands above to validate coverage before submitting a PR.
 
 ## Ruff
 
