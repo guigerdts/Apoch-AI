@@ -4,17 +4,47 @@
 
 ---
 
-## Prerequisites
+## Minimum Requirements
 
-| Requirement | Version | Install | Check |
-|-------------|---------|---------|-------|
-| Python | >= 3.13 | System package manager | `python --version` |
-| uv | latest | `curl -LsSf https://astral.sh/uv/install.sh \| sh` | `uv --version` |
-| Node.js | >= 20.19.0 | `apt install nodejs` or `brew install node` | `node --version` |
-| npm | bundled with Node | (comes with Node) | `npm --version` |
-| Homebrew | latest | `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"` | `brew --version` |
+| Requirement | Version | Why |
+|-------------|---------|-----|
+| **Python** | >= 3.13 | Runtime |
+| **git** | any | Clone the repo |
+| **uv** | latest | Dependency management (see install path below) |
+| **Node.js + npm** | >= 20.19.0 | Required by some stack components (OpenSpec, CodeGraph, Context7) |
 
-## Install from Source (Current)
+> **Only Python, git, and uv are needed to run Apoch-AI itself.**  
+> Node.js and npm are only needed if you install third-party stack components on top.
+
+---
+
+## Prerequisites (by platform)
+
+### Linux / macOS
+
+| Tool | Install command |
+|------|----------------|
+| **uv** | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| **Node.js** | `apt install nodejs npm` (Debian/Ubuntu) or `brew install node` (macOS) |
+
+### Termux (Android)
+
+The `uv` install script doesn't support `aarch64-linux-android`, so use `pip` directly:
+
+```bash
+pkg update && pkg upgrade
+pkg install python git nodejs
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+Every `uv run apoch ...` command must be prefixed with `uv run` on Linux/macOS.  
+On Termux, use `.venv/bin/apoch ...` instead (or activate the venv first).
+
+---
+
+## Install from Source (Linux / macOS)
 
 ```bash
 # 1. Install uv (if you don't have it)
@@ -30,6 +60,18 @@ uv sync
 
 This creates a virtual environment at `.venv/` and installs all dependencies.
 
+## Install from Source (Termux)
+
+```bash
+pkg update && pkg upgrade
+pkg install python git nodejs
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+> On Termux, activate the venv first (`source .venv/bin/activate`) or use `.venv/bin/apoch` instead of `uv run apoch`.
+
 ## Install from PyPI — ⚠️ Not Yet Available
 
 > **Apoch-AI has NOT been published to PyPI yet.**  
@@ -38,7 +80,6 @@ This creates a virtual environment at `.venv/` and installs all dependencies.
 
 ```bash
 pip install apoch-ai        # ⛔ won't work until published
-uv pip install apoch-ai     # ⛔ won't work until published
 ```
 
 ## Verify Installation
@@ -96,3 +137,12 @@ export PATH="$HOME/.local/bin:$PATH"
 npm bin -g
 # → /usr/local/bin  (or /opt/homebrew/bin on Apple Silicon)
 ```
+
+## Platform Support
+
+| Platform | Status | Notes |
+|----------|--------|-------|
+| Linux (x86_64) | ✅ Supported | Primary target |
+| macOS (arm64 / x86_64) | ✅ Supported | Tested on Apple Silicon |
+| Windows (WSL) | ✅ Supported | Use the Linux instructions inside WSL |
+| Termux (aarch64) | ⚠️ Works | Uses pip instead of uv, see [Termux install](#install-from-source-termux) above |

@@ -12,7 +12,7 @@ Apoch-AI is **not** a coding agent, an LLM, a model provider, or an IDE. It is a
 
 - **Stack Management** — Install, verify, and manage developer tooling (OpenSpec, Engram, Context7, CodeGraph) through a unified CLI.
 - **Modular Architecture** — Independent, installable components and native modules that extend your agent without modifying its workflow.
-- **Cross-Platform** — macOS, Linux, Windows, WSL, and Termux.
+- **Cross-Platform** — macOS, Linux, Windows (WSL), and Termux (Android).
 - **Agent-Agnostic** — Works with any AI coding agent. Version 1 targets OpenCode.
 - **Spec-Driven Development** — Every feature follows OpenSpec methodology: Proposal → Spec → Design → Tasks → Apply → Verify → Archive.
 - **401 Tests** — Comprehensive test suite with MockRunner-based lifecycle testing across all components.
@@ -20,6 +20,10 @@ Apoch-AI is **not** a coding agent, an LLM, a model provider, or an IDE. It is a
 ---
 
 ## Quick Start
+
+**Minimum requirements:** Python 3.13+, git, and [uv](https://docs.astral.sh/uv/).
+
+> **Termux user?** See the [Termux install guide](docs/installation.md#install-from-source-termux) — `uv` doesn't support Android, so you'll use `pip` instead.
 
 ```bash
 # Install uv (Python package manager)
