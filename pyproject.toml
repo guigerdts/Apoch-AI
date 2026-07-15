@@ -27,9 +27,10 @@ vision = "apoch.modules.vision.module:VisionModule"
 # Third-party plugins register here
 
 [project.entry-points."apoch.stack.components"]
+codegraph = "apoch.stack.components.codegraph:CodeGraphComponent"
 context7 = "apoch.stack.components.context7:Context7Component"
-openspec = "apoch.stack.components.openspec:OpenSpecComponent"
 engram = "apoch.stack.components.engram:EngramComponent"
+openspec = "apoch.stack.components.openspec:OpenSpecComponent"
 
 [build-system]
 requires = ["setuptools"]
@@ -45,6 +46,14 @@ pythonpath = ["src"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "module"
 asyncio_default_test_loop_scope = "module"
+markers = [
+    "unit: Pure logic tests with no I/O or external dependencies.",
+    "integration: Tests using MockRunner to simulate CLI behaviour.",
+    "e2e: Tests requiring real CLI tools installed on the system.",
+    "benchmark: Performance measurement (non-blocking).",
+    "slow: Tests taking more than 1 second to execute.",
+    "destructive: Tests that install or uninstall tools (CI only).",
+]
 
 [tool.ruff]
 target-version = "py313"
