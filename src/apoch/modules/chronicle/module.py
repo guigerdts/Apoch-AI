@@ -108,9 +108,29 @@ class ChronicleModule(Module):
         """Persist an activity event."""
         self._store.record(event)
 
-    async def query(self, event_filter: EventFilter | None = None) -> list[ActivityEvent]:
-        """Retrieve events matching *event_filter* (default: no filter)."""
-        return self._store.query(event_filter or EventFilter())
+    async def query(
+        self,
+        event_filter: EventFilter | None = None,
+        since: str | None = None,
+        limit: int | None = None,
+    ) -> list[ActivityEvent]:
+        """Retrieve events matching filters, newest first.
+
+        Accepts either an ``EventFilter`` object OR individual kwargs
+        (``since``, ``limit``).  If both are given, kwargs override the
+        corresponding ``EventFilter`` fields.
+
+        Args:
+            event_filter: Structured filter (type, source, severity, since, until, limit).
+            since:        ISO 8601 — only events at or after this timestamp.
+            limit:        Maximum number of events to return.
+        """
+        ef = event_filter or EventFilter()
+        if since is not None:
+            ef.since = since
+        if limit is not None:
+            ef.limit = limit
+        return self._store.query(ef)
 
     # ------------------------------------------------------------------
     # MCP tool handlers (thin wrappers — adapt individual kwargs to

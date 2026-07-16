@@ -13,7 +13,7 @@ Architecture constraints:
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from apoch.adapters.base import ToolDef
@@ -202,11 +202,13 @@ class ApochCoordinator:
                 self._timeouts.get("guardian", 0.5),
             ))
 
-        # Chronicle — query() with recent events limit (mandatory)
+        # Chronicle — query() with recent events limit AND window (mandatory)
         if self._services.chronicle is not None and hasattr(self._services.chronicle, "query"):
+            window = timedelta(minutes=STATUS_RECENT_WINDOW_MINUTES)
+            since = (datetime.now(UTC) - window).isoformat()
             queries.append((
                 "chronicle",
-                self._services.chronicle.query(limit=STATUS_RECENT_EVENTS_LIMIT),
+                self._services.chronicle.query(since=since, limit=STATUS_RECENT_EVENTS_LIMIT),
                 self._timeouts.get("chronicle", 0.5),
             ))
 

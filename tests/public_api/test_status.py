@@ -23,6 +23,7 @@ import pytest
 
 from apoch.public_api.coordinator import (
     STATUS_RECENT_EVENTS_LIMIT,
+    STATUS_RECENT_WINDOW_MINUTES,
     ApochCoordinator,
 )
 from apoch.public_api.registry import ServiceRegistry
@@ -74,14 +75,23 @@ class _FakeChronicle:
         # Explicit None check — empty list [] is a valid "no events" value.
         self._events = [{"event": "test"}] if events is None else events
 
-    async def query(self, limit: int = STATUS_RECENT_EVENTS_LIMIT) -> list:
+    async def query(
+        self,
+        limit: int = STATUS_RECENT_EVENTS_LIMIT,
+        since: str | None = None,
+    ) -> list:
+        self._last_since = since
         return self._events[:limit]
 
 
 class _SlowChronicle:
     """Chronicle module that sleeps beyond the configured timeout."""
 
-    async def query(self, limit: int = STATUS_RECENT_EVENTS_LIMIT) -> list:
+    async def query(
+        self,
+        limit: int = STATUS_RECENT_EVENTS_LIMIT,
+        since: str | None = None,
+    ) -> list:
         await asyncio.sleep(10)
         return [{"event": "too_late"}]
 
@@ -195,6 +205,23 @@ class TestStatusHappyPath:
         coordinator = ApochCoordinator(happy_registry)
         result = await coordinator.status()
         assert result["api_version"] == "1.0"
+
+    async def test_chronicle_receives_since_parameter(
+        self, happy_registry: ServiceRegistry,
+    ) -> None:
+        """Chronicle query receives a valid ISO since from WINDOW_MINUTES."""
+        coordinator = ApochCoordinator(happy_registry)
+        await coordinator.status()
+        chronicle = happy_registry.chronicle
+        assert chronicle._last_since is not None  # noqa: SLF001
+        # Verify it's a valid ISO 8601 timestamp
+        from datetime import UTC, datetime
+        parsed = datetime.fromisoformat(chronicle._last_since)
+        assert parsed.tzinfo is not None
+        # Should be STATUS_RECENT_WINDOW_MINUTES ago (±2s tolerance)
+        age = (datetime.now(UTC) - parsed).total_seconds()
+        expected = STATUS_RECENT_WINDOW_MINUTES * 60
+        assert abs(age - expected) < 2  # within 2s of 5min
 
 
 class TestStatusProblems:
