@@ -83,8 +83,8 @@ Sin Coordinator todavía. Sin registro MCP. Sin tools visibles.
 
 ## PR 2: apoch_status (Public Stable)
 
-- [ ] 2.1 Registrar `apoch_status` en MCP + implementar `ApochCoordinator.status()` orquestando Vision, Guardian, Chronicle, Oracle. Tests (happy, timeout, sin datos, problemas) + validación MCP + Go/No-Go.
-- [ ] 2.2 **Acceptance Gate**: tool visible en tools/list, ninguna tool futura visible, ninguna devuelve ERR_NOT_IMPLEMENTED.
+- [x] 2.1 Registrar `apoch_status` en MCP + implementar `ApochCoordinator.status()` orquestando Vision, Guardian, Chronicle, Oracle. Tests (happy, timeout, sin datos, problemas) + validación MCP + Go/No-Go.
+- [x] 2.2 **Acceptance Gate**: tool visible en tools/list, ninguna tool futura visible, ninguna devuelve ERR_NOT_IMPLEMENTED.
 
 ## PR 3: apoch_health (Public Stable)
 

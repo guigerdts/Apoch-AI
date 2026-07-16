@@ -16,6 +16,7 @@ import asyncio
 from datetime import UTC, datetime
 from typing import Any
 
+from apoch.adapters.base import ToolDef
 from apoch.public_api.errors import error_response
 from apoch.public_api.models import EvidenceSource
 from apoch.public_api.registry import ServiceRegistry
@@ -31,6 +32,10 @@ DEFAULT_TIMEOUTS: dict[str, float] = {
     "pulse": 0.5,
     "optimizer": 1.0,
 }
+
+# ── Status query constants ────────────────────────────────────────────────
+STATUS_RECENT_EVENTS_LIMIT: int = 5
+STATUS_RECENT_WINDOW_MINUTES: int = 5
 
 # ── Confidence labels ─────────────────────────────────────────────────────
 _CONFIDENCE_RANGES: list[tuple[float, str]] = [
@@ -152,9 +157,141 @@ class ApochCoordinator:
     # ── Public tools (stubs — return ERR_NOT_IMPLEMENTED) ─────────────────
     # ── Business logic will be implemented in PR2 through PR8.
 
+    # ── Tool definition registration ─────────────────────────────────────
+
+    @classmethod
+    def get_tool_defs(cls) -> list[ToolDef]:
+        """Return the ToolDef for apoch_status (progressive registration)."""
+        return [
+            ToolDef(
+                name="apoch_status",
+                description=(
+                    "Estado general del sistema: componentes activos, "
+                    "problemas detectados y actividad reciente."
+                ),
+                input_schema={"type": "object", "properties": {}},
+                handler_name="status",
+            ),
+        ]
+
     async def status(self) -> dict[str, Any]:
-        """General system status — stubbed."""
-        return self._build_error_response("ERR_NOT_IMPLEMENTED", "Not implemented yet")
+        """General system status — orchestrate Vision, Guardian, Chronicle, Oracle.
+
+        Builds a unified view: active components, detected problems, recent
+        activity, and a quick recommendation (if Oracle responds).
+
+        Spec: mcp-public-api §Tool 1: apoch_status, §Niveles de Confianza
+        Design: ADR-001 (orchestration), ADR-004 (timeouts), ADR-007 (concurrency)
+        """
+        queries: list[tuple[str, Any, float]] = []
+
+        # Vision — module_state() (mandatory)
+        if self._services.vision is not None and hasattr(self._services.vision, "module_state"):
+            queries.append((
+                "vision",
+                self._services.vision.module_state(),
+                self._timeouts.get("vision", 1.0),
+            ))
+
+        # Guardian — all_diagnostics() (mandatory)
+        if (self._services.guardian is not None
+                and hasattr(self._services.guardian, "all_diagnostics")):
+            queries.append((
+                "guardian",
+                self._services.guardian.all_diagnostics(),
+                self._timeouts.get("guardian", 0.5),
+            ))
+
+        # Chronicle — query() with recent events limit (mandatory)
+        if self._services.chronicle is not None and hasattr(self._services.chronicle, "query"):
+            queries.append((
+                "chronicle",
+                self._services.chronicle.query(limit=STATUS_RECENT_EVENTS_LIMIT),
+                self._timeouts.get("chronicle", 0.5),
+            ))
+
+        # Oracle — status/recommend (optional)
+        if self._services.oracle is not None and hasattr(self._services.oracle, "status"):
+            queries.append((
+                "oracle",
+                self._services.oracle.status(),
+                self._timeouts.get("oracle", 2.0),
+            ))
+
+        results = await self._query_modules(queries)
+
+        # Unpack module results.
+        vision_data = results.get("vision")
+        guardian_data = results.get("guardian")
+        chronicle_data = results.get("chronicle")
+        oracle_data = results.get("oracle")
+
+        # Determine overall state.
+        has_problems = False
+        if guardian_data is not None and isinstance(guardian_data, dict):
+            diagnostics = guardian_data.get("diagnostics", []) or []
+            has_problems = any(
+                d.get("severity") in ("ERROR", "CRITICAL") for d in diagnostics
+            )
+
+        all_mandatory = all(
+            results.get(m) is not None for m in ("vision", "guardian", "chronicle")
+        )
+        no_data = all(v is None for v in results.values())
+
+        if no_data:
+            return self._build_error_response("ERR_TIMEOUT", "No modules responded")
+
+        if has_problems:
+            summary = "🔴 Sistema operativo con problemas detectados"
+        elif not all_mandatory:
+            summary = "🟡 Sistema funcionando con limitaciones"
+        else:
+            summary = "🟢 Todos los sistemas operativos"
+
+        # Build explanation.
+        parts: list[str] = []
+        if vision_data is not None:
+            items_count = (
+                len(vision_data)
+                if isinstance(vision_data, (list, dict))
+                else 0
+            )
+            if items_count:
+                parts.append(f"{items_count} componentes activos")
+            else:
+                parts.append("Componentes activos")
+        if has_problems:
+            parts.append("problemas detectados")
+        elif guardian_data is not None:
+            parts.append("sin errores")
+        if chronicle_data is not None:
+            if isinstance(chronicle_data, (list, dict)) and not chronicle_data:
+                parts.append("sin actividad registrada")
+            else:
+                parts.append("actividad reciente disponible")
+        else:
+            parts.append("sin datos de actividad reciente")
+
+        explanation = " — ".join(parts) if parts else "Estado general del sistema"
+
+        # Determine suggested_action.
+        if oracle_data is not None:
+            suggested_action = (
+                oracle_data.get("suggested_action")
+                or "Ninguna acción requerida"
+            )
+        elif has_problems:
+            suggested_action = "Revise los problemas detectados"
+        else:
+            suggested_action = "Ninguna acción requerida"
+
+        return self._build_success_response(
+            results=results,
+            summary=summary,
+            explanation=explanation,
+            suggested_action=suggested_action,
+        )
 
     async def history(
         self,

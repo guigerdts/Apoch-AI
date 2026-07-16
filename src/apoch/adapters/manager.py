@@ -108,9 +108,13 @@ class AgentAdapterManager:
                                      services.optimizer, services.oracle]
                          if s is not None))
 
-        # 4. No coordinator tools registered yet — Progressive Registration policy.
-        #    Each PR (PR2 through PR8) will register exactly one tool.
-        #    See ADR-001 (Public Registration Policy) and P10 (Public Visibility Rule).
+        # 4. Register coordinator tools (progressive registration — only apoch_status in PR2).
+        if self._coordinator is not None and hasattr(self._coordinator, "get_tool_defs"):
+            coord_defs = self._coordinator.get_tool_defs()
+            if coord_defs:
+                await self._adapter.register_module_tools(
+                    "coordinator", self._coordinator, coord_defs
+                )
 
         # 5. Discover and register existing module tool definitions.
         #    Deterministic: iterate sorted module names.

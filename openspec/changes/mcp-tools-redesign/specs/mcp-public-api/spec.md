@@ -140,10 +140,17 @@ Es el panel principal. Cualquier usuario necesita saber si el sistema está func
 #### 1.4 Output Contract
 - **Entradas**: Ninguna.
 - **Salida**: Summary, Explanation, Evidence, Suggested Action, Confidence, generated_at, data_freshness.
-- **Contiene**: Estado general, componentes activos, problemas detectados, actividad reciente, recomendación rápida.
-- **Casos sin datos**: "Sistema iniciado, sin actividad registrada." (ERR_NO_DATA si no hay ningún módulo disponible)
+- **Contiene**: Estado general, componentes activos, problemas detectados, actividad reciente, recomendación rápida (solo si Oracle responde).
+- **Casos sin datos**: "Sistema iniciado, sin actividad registrada." (ERR_NO_DATA si no hay ningún módulo disponible). Si Chronicle responde sin eventos en la ventana → actividad reciente vacía con el mismo mensaje.
 - **Tiempo objetivo**: < 2 segundos.
-- **Confidence**: siempre HIGH (es estado actual, no predicción).
+- **Confidence**:
+  - Happy path (todos los módulos consultados responden): HIGH (≥0.75)
+  - Degradación parcial (falta algún módulo): baja proporcionalmente según `available / total queried`
+  - Sin módulos que respondan: ERR_TIMEOUT con confidence 0.0
+- **Oracle**: Módulo OPCIONAL. Si no responde, `suggested_action` por defecto = "Ninguna acción requerida" (derivado de otros módulos). La recomendación rápida solo aparece si Oracle responde.
+- **Actividad reciente**: Acotada por constantes: `STATUS_RECENT_EVENTS_LIMIT = 5` (máx. 5 eventos) y `STATUS_RECENT_WINDOW_MINUTES = 5` (últimos 5 min). Se usa el que tenga MENOS eventos. Sin eventos en la ventana → "Sin actividad registrada".
+- **Consulta a Chronicle**: Usa los mismos límites (`STATUS_RECENT_EVENTS_LIMIT`, `STATUS_RECENT_WINDOW_MINUTES`). Si Chronicle timeout/error → no hay datos de actividad, confidence se reduce. Si 0 eventos → "Sin actividad registrada".
+- **EvidenceSource.source**: El campo `source` en `evidence[]` (ej. "Vision", "Guardian") es un identificador técnico interno de la API, no texto de respuesta al usuario. No constituye exposición de implementación (P6) porque los nombres de módulo no aparecen en `summary`, `explanation` ni `suggested_action`.
 
 #### 1.5 UX Validation
 - **Usuario nuevo**: "Status = estado del sistema. Lo llamo cuando quiero saber si todo está bien."

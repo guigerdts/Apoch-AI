@@ -12,8 +12,6 @@ Verifies that the Manager:
 
 from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
-import pytest
-
 from apoch.adapters.base import ToolDef
 from apoch.core.registry import ModuleRegistry
 

@@ -348,7 +348,7 @@ class TestBuildResponse:
 
 
 class TestToolStubs:
-    """All 7 tool methods return ERR_NOT_IMPLEMENTED."""
+    """6 remaining tool methods return ERR_NOT_IMPLEMENTED (status is now implemented)."""
 
     @pytest.fixture
     def coordinator(self):
@@ -357,10 +357,13 @@ class TestToolStubs:
 
         return ApochCoordinator(ServiceRegistry())
 
-    async def test_status_not_implemented(self, coordinator):
+    async def test_status_empty_registry(self, coordinator):
+        """status() with empty registry → ERR_TIMEOUT (no modules to query)."""
         result = await coordinator.status()
         assert result["ok"] is False
-        assert result["error"]["code"] == "ERR_NOT_IMPLEMENTED"
+        # With an empty ServiceRegistry, no modules are queried → ERR_TIMEOUT
+        assert result["error"]["code"] == "ERR_TIMEOUT"
+        assert "No modules responded" in result["error"]["message"]
 
     async def test_health_not_implemented(self, coordinator):
         result = await coordinator.health()
