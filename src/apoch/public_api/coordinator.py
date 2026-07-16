@@ -132,11 +132,17 @@ class ApochCoordinator:
         summary: str,
         explanation: str,
         suggested_action: str | None = None,
+        confidence: float | None = None,
     ) -> dict[str, Any]:
-        """Build a successful ToolResponse-compatible dict."""
+        """Build a successful ToolResponse-compatible dict.
+
+        If *confidence* is provided, it is used directly. Otherwise it is
+        calculated from *results* via ``_calculate_confidence()``.
+        """
         now = datetime.now(UTC)
         evidence = self._build_evidence(results)
-        confidence = self._calculate_confidence(results)
+        if confidence is None:
+            confidence = self._calculate_confidence(results)
         return {
             "api_version": API_VERSION,
             "summary": summary,
@@ -161,7 +167,13 @@ class ApochCoordinator:
 
     @classmethod
     def get_tool_defs(cls) -> list[ToolDef]:
-        """Return the ToolDef for apoch_status (progressive registration)."""
+        """Return the ToolDefs for all implemented public tools (progressive registration).
+
+        PR2: apoch_status
+        PR3: apoch_health
+        Future PRs add one tool at a time.
+        Only fully implemented tools are registered — no stubs visible.
+        """
         return [
             ToolDef(
                 name="apoch_status",
@@ -171,6 +183,15 @@ class ApochCoordinator:
                 ),
                 input_schema={"type": "object", "properties": {}},
                 handler_name="status",
+            ),
+            ToolDef(
+                name="apoch_health",
+                description=(
+                    "Diagnóstico del sistema: problemas activos, su severidad, "
+                    "posible causa y acción recomendada."
+                ),
+                input_schema={"type": "object", "properties": {}},
+                handler_name="health",
             ),
         ]
 
@@ -304,8 +325,136 @@ class ApochCoordinator:
         return self._build_error_response("ERR_NOT_IMPLEMENTED", "Not implemented yet")
 
     async def health(self) -> dict[str, Any]:
-        """Interpreted diagnostics — stubbed."""
-        return self._build_error_response("ERR_NOT_IMPLEMENTED", "Not implemented yet")
+        """Diagnose system health — classify problems via Guardian, enrich with Vision.
+
+        Spec: mcp-public-api §Tool 2: apoch_health
+        Design: ADR-001 (orchestration), ADR-004 (timeouts), ADR-007 (concurrency)
+
+        Boundaries (see apoch_health-boundary-review.md):
+        - NEVER recommends actions (belongs to recommend)
+        - NEVER shows history (belongs to history)
+        - NEVER interprets productivity or patterns (belongs to progress/insights)
+        - Action per problem = micro-action for THAT problem, not prioritization
+        - Guardian is authoritative for diagnostics. Vision enriches but does not define.
+        - Confidence: HIGH when both respond; MEDIUM when Guardian only.
+        """
+        queries: list[tuple[str, Any, float]] = []
+
+        # Guardian — all_diagnostics() (mandatory — health's purpose)
+        if (self._services.guardian is not None
+                and hasattr(self._services.guardian, "all_diagnostics")):
+            queries.append((
+                "guardian",
+                self._services.guardian.all_diagnostics(),
+                self._timeouts.get("guardian", 0.5),
+            ))
+
+        # Vision — module_state() (optional — enrichment)
+        if self._services.vision is not None and hasattr(self._services.vision, "module_state"):
+            queries.append((
+                "vision",
+                self._services.vision.module_state(),
+                self._timeouts.get("vision", 1.0),
+            ))
+
+        results = await self._query_modules(queries)
+        guardian_data = results.get("guardian")
+        vision_data = results.get("vision")
+
+        # If Guardian fails, health cannot produce a diagnosis
+        if guardian_data is None:
+            if vision_data is not None:
+                explanation = (
+                    "No se pudo obtener diagnóstico del sistema. "
+                    "Componentes activos pero sin información de salud."
+                )
+            else:
+                explanation = "No se pudo obtener diagnóstico del sistema."
+            return self._build_error_response(
+                "ERR_DEPENDENCY_UNAVAILABLE",
+                explanation,
+            )
+
+        # Parse diagnostics from Guardian
+        diagnostics: list[dict] = []
+        if isinstance(guardian_data, dict):
+            diagnostics = guardian_data.get("diagnostics", []) or []
+
+        # Classify severity
+        has_critical = any(
+            d.get("severity") in ("ERROR", "CRITICAL") for d in diagnostics
+        )
+        has_warning = any(
+            d.get("severity") == "WARNING" for d in diagnostics
+        )
+
+        # Build summary
+        if has_critical:
+            summary = "🔴 Se detectaron problemas críticos en el sistema"
+        elif has_warning:
+            summary = "🟡 Se detectaron advertencias en el sistema"
+        else:
+            summary = "🟢 Sin problemas detectados"
+
+        # Build explanation with per-problem details
+        parts: list[str] = []
+        if diagnostics:
+            # Sort: most severe first
+            severity_order = {"CRITICAL": 0, "ERROR": 1, "WARNING": 2}
+            sorted_diags = sorted(
+                diagnostics,
+                key=lambda d: severity_order.get(d.get("severity", ""), 99),
+            )
+            for diag in sorted_diags:
+                sev = diag.get("severity", "UNKNOWN")
+                module = diag.get("module", "desconocido")
+                msg = diag.get("message", "")
+                parts.append(f"[{sev}] {module}: {msg}")
+        elif vision_data is not None:
+            parts.append("No hay problemas registrados en el sistema")
+        else:
+            parts.append("No hay problemas registrados")
+
+        explanation = "\n".join(parts)
+
+        # Build suggested_action from most severe problem
+        if diagnostics:
+            severity_order = {"CRITICAL": 0, "ERROR": 1, "WARNING": 2}
+            sorted_diags = sorted(
+                diagnostics,
+                key=lambda d: severity_order.get(d.get("severity", ""), 99),
+            )
+            worst = sorted_diags[0]
+            sev = worst.get("severity", "")
+            module = worst.get("module", "")
+            if sev in ("ERROR", "CRITICAL"):
+                suggested_action = (
+                    f"Revise el módulo {module}. "
+                    f"Puede intentar reiniciar el módulo o revisar su configuración."
+                )
+            elif sev == "WARNING":
+                suggested_action = (
+                    f"Revise la advertencia en {module} "
+                    f"para evitar que evolucione a un problema crítico."
+                )
+            else:
+                suggested_action = "Ninguna acción requerida"
+        else:
+            suggested_action = "Ninguna acción requerida"
+
+        # Confidence: expected = 2 (guardian + vision), available = those that
+        # actually responded. This ensures MEDIUM when only Guardian responds.
+        n_expected = 2
+        n_available = sum(1 for v in results.values() if v is not None)
+        health_confidence = round(n_available / n_expected, 2)
+
+        return self._build_success_response(
+            results=results,
+            summary=summary,
+            explanation=explanation,
+            suggested_action=suggested_action,
+            confidence=health_confidence,
+        )
 
     async def recommend(self) -> dict[str, Any]:
         """Next action recommendation — stubbed."""

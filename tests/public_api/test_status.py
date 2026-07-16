@@ -462,9 +462,9 @@ class TestStatusCoordinatorLifecycle:
     """Coordinator construction and tool def registration."""
 
     def test_get_tool_defs_returns_apoch_status(self) -> None:
-        """get_tool_defs returns exactly one ToolDef for apoch_status."""
+        """get_tool_defs returns apoch_status as first entry."""
         defs = ApochCoordinator.get_tool_defs()
-        assert len(defs) == 1
+        assert len(defs) >= 1
         assert defs[0].name == "apoch_status"
         assert defs[0].handler_name == "status"
         assert defs[0].description
@@ -474,17 +474,18 @@ class TestStatusCoordinatorLifecycle:
         """get_tool_defs works on the class, not just instances."""
         # Call via class directly
         defs = ApochCoordinator.get_tool_defs()
-        assert len(defs) == 1
+        assert len(defs) >= 1
+        assert defs[0].name == "apoch_status"
 
         # Call via instance also works
         coordinator = ApochCoordinator(ServiceRegistry())
         defs_via_instance = coordinator.get_tool_defs()
-        assert len(defs_via_instance) == 1
+        assert len(defs_via_instance) >= 1
         assert defs_via_instance[0].name == "apoch_status"
 
 
 class TestStatusOtherToolsStillStubs:
-    """Non-status tools still return ERR_NOT_IMPLEMENTED."""
+    """Non-status, non-health tools still return ERR_NOT_IMPLEMENTED."""
 
     @pytest.fixture
     def coordinator(self) -> ApochCoordinator:
@@ -492,11 +493,6 @@ class TestStatusOtherToolsStillStubs:
 
     async def test_history_stub(self, coordinator: ApochCoordinator) -> None:
         result = await coordinator.history()
-        assert result["ok"] is False
-        assert result["error"]["code"] == "ERR_NOT_IMPLEMENTED"
-
-    async def test_health_stub(self, coordinator: ApochCoordinator) -> None:
-        result = await coordinator.health()
         assert result["ok"] is False
         assert result["error"]["code"] == "ERR_NOT_IMPLEMENTED"
 

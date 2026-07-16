@@ -88,8 +88,8 @@ Sin Coordinator todavía. Sin registro MCP. Sin tools visibles.
 
 ## PR 3: apoch_health (Public Stable)
 
-- [ ] 3.1 Registrar `apoch_health` en MCP + implementar `ApochCoordinator.health()` con clasificación 🟢/🟡/🔴. Tests (sin problemas, advertencia, crítico, Guardian no disponible) + validación + Go/No-Go.
-- [ ] 3.2 **Acceptance Gate**: tool visible, futuras no, ninguna ERR_NOT_IMPLEMENTED.
+- [x] 3.1 Registrar `apoch_health` en MCP + implementar `ApochCoordinator.health()` con clasificación 🟢/🟡/🔴. Tests (sin problemas, advertencia, crítico, Guardian no disponible) + validación + Go/No-Go.
+- [x] 3.2 **Acceptance Gate**: tool visible, futuras no, ninguna ERR_NOT_IMPLEMENTED.
 
 ## PR 4: apoch_history (Public Stable)
 
