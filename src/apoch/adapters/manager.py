@@ -22,6 +22,8 @@ from apoch.adapters.base import AgentAdapter, ToolDef
 from apoch.core.engine import Engine
 from apoch.core.exceptions import ApochError
 from apoch.core.registry import ModuleRegistry
+from apoch.public_api.coordinator import ApochCoordinator
+from apoch.public_api.registry import ServiceRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +51,16 @@ class AgentAdapterManager:
         self._registry = registry
         self._config: dict[str, Any] = config or {}
         self._engine: Engine | None = None
+        self._coordinator: ApochCoordinator | None = None
+
+    # ------------------------------------------------------------------
+    # Public accessors
+    # ------------------------------------------------------------------
+
+    @property
+    def coordinator(self) -> ApochCoordinator | None:
+        """Return the ApochCoordinator, or None before :meth:`start`."""
+        return self._coordinator
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -78,11 +90,33 @@ class AgentAdapterManager:
         self._engine = Engine(registry=self._registry, config=self._config)
         await self._engine.start()
 
-        # 3. Discover and register tool definitions.
+        # 3. Build ServiceRegistry and create Coordinator.
+        # Read loaded modules from engine.registry (which may be mocked in tests).
+        loaded = self._engine.registry.loaded
+        services = ServiceRegistry(
+            vision=loaded.get("vision"),
+            chronicle=loaded.get("chronicle"),
+            guardian=loaded.get("guardian"),
+            pulse=loaded.get("pulse"),
+            optimizer=loaded.get("optimizer"),
+            oracle=loaded.get("oracle"),
+        )
+        self._coordinator = ApochCoordinator(services)
+        logger.info("ApochCoordinator created with %d service(s)",
+                     sum(1 for s in [services.vision, services.chronicle,
+                                     services.guardian, services.pulse,
+                                     services.optimizer, services.oracle]
+                         if s is not None))
+
+        # 4. No coordinator tools registered yet — Progressive Registration policy.
+        #    Each PR (PR2 through PR8) will register exactly one tool.
+        #    See ADR-001 (Public Registration Policy) and P10 (Public Visibility Rule).
+
+        # 5. Discover and register existing module tool definitions.
         #    Deterministic: iterate sorted module names.
         module_tools: list[tuple[str, Any, list[ToolDef]]] = []
-        for mod_name in sorted(self._registry.loaded):
-            mod = self._registry.loaded[mod_name]
+        for mod_name in sorted(loaded):
+            mod = loaded[mod_name]
             if hasattr(mod, "get_tool_defs"):
                 defs = mod.get_tool_defs()
                 if defs:
@@ -114,4 +148,18 @@ class AgentAdapterManager:
         await self._adapter.stop()
         await self._engine.stop()
         self._engine = None
+
+    async def serve(self) -> None:
+        """Start and run the MCP gateway (blocking, stdio transport).
+
+        Calls ``start()`` (which is idempotent and registers all
+        module tools), then enters the stdio transport loop that
+        blocks until cancelled.
+
+        This is the main entry point for ``apoch mcp serve``.
+        """
+        await self.start()
+        logger.info("AgentAdapterManager entering serve loop...")
+        await self._adapter.serve()
+
         logger.info("AgentAdapterManager stopped")

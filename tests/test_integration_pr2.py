@@ -32,12 +32,10 @@ class TestInstallEndToEnd:
 
         from apoch.cli.app import app
 
-        # Create an existing opencode.json with a non-Apoch tool
-        opencode_dir = tmp_path / ".opencode"
-        opencode_dir.mkdir(parents=True)
-        config_path = opencode_dir / "opencode.json"
+        # Create an existing opencode.json with a non-Apoch tool (at root level)
+        config_path = tmp_path / "opencode.json"
         config_path.write_text(
-            json.dumps({"mcpServers": {"existing-tool": {"command": "tool", "args": []}}})
+            json.dumps({"mcp": {"existing-tool": {"command": "tool", "args": []}}})
         )
 
         monkeypatch.chdir(tmp_path)
@@ -50,32 +48,34 @@ class TestInstallEndToEnd:
         assert "Apoch-AI installed" in result.output or "already installed" in result.output
 
         # Verify backup was created
-        backup_dir = opencode_dir / ".apoch-backups"
+        backup_dir = tmp_path / ".apoch-backups"
         backups = list(backup_dir.glob("opencode-*.json"))
         assert len(backups) >= 1, "No backup file was created"
 
-        # Verify the apoch entry was written
+        # Verify the apoch entry was written (command may be absolute path)
         written = json.loads(config_path.read_text())
-        assert "apoch" in written["mcpServers"]
-        assert written["mcpServers"]["apoch"]["command"] == "apoch"
+        assert "apoch" in written["mcp"]
+        cmd = written["mcp"]["apoch"]["command"]
+        suffix = cmd[-2:]
+        assert suffix == ["mcp", "serve"], f"Command should end with 'mcp serve', got {cmd}"
+        assert isinstance(cmd[0], str) and cmd[0], "Command must be a non-empty string"
 
     def test_install_idempotent_when_already_installed(self, tmp_path: Path, monkeypatch) -> None:
         """apoch install is idempotent — reports already installed."""
         from typer.testing import CliRunner
 
+        from apoch.adapters.opencode.server import OpenCodeAdapter
         from apoch.cli.app import app
+        resolved = OpenCodeAdapter._resolve_apoch_command() + ["mcp", "serve"]
 
-        opencode_dir = tmp_path / ".opencode"
-        opencode_dir.mkdir(parents=True)
-        config_path = opencode_dir / "opencode.json"
+        config_path = tmp_path / "opencode.json"
         config_path.write_text(
             json.dumps(
                 {
-                    "mcpServers": {
+                    "mcp": {
                         "apoch": {
-                            "command": "apoch",
-                            "args": ["mcp"],
-                            "description": "Apoch-AI MCP gateway",
+                            "command": resolved,
+                            "type": "local",
                         },
                     }
                 }
@@ -92,7 +92,7 @@ class TestInstallEndToEnd:
         assert "already installed" in result.output
 
         # Backup was cleaned up by discard_install (no changes needed)
-        backup_dir = opencode_dir / ".apoch-backups"
+        backup_dir = tmp_path / ".apoch-backups"
         if backup_dir.exists():
             backups = list(backup_dir.glob("opencode-*.json"))
             assert len(backups) == 0  # discarded because already installed
@@ -103,9 +103,7 @@ class TestInstallEndToEnd:
 
         from apoch.cli.app import app
 
-        opencode_dir = tmp_path / ".opencode"
-        opencode_dir.mkdir(parents=True)
-        config_path = opencode_dir / "opencode.json"
+        config_path = tmp_path / "opencode.json"
         original = json.dumps({"key": "value"})
         config_path.write_text(original)
 
@@ -122,7 +120,7 @@ class TestInstallEndToEnd:
         assert config_path.read_text() == original
 
         # Backup should have been cleaned up by discard_install
-        backup_dir = opencode_dir / ".apoch-backups"
+        backup_dir = tmp_path / ".apoch-backups"
         if backup_dir.exists():
             backups = list(backup_dir.glob("opencode-*.json"))
             assert len(backups) == 0  # discard_install removed the backup
@@ -142,13 +140,12 @@ class TestUninstallEndToEnd:
 
         from apoch.cli.app import app
 
-        opencode_dir = tmp_path / ".opencode"
-        opencode_dir.mkdir(parents=True)
-        config_path = opencode_dir / "opencode.json"
-        config_path.write_text(json.dumps({"mcpServers": {"apoch": {"command": "apoch"}}}))
+        config_path = tmp_path / "opencode.json"
+        config_data = {"mcp": {"apoch": {"command": ["apoch", "mcp", "serve"]}}}
+        config_path.write_text(json.dumps(config_data))
 
         # Create a backup (as install would have done)
-        backup_dir = opencode_dir / ".apoch-backups"
+        backup_dir = tmp_path / ".apoch-backups"
         backup_dir.mkdir(parents=True)
         original_backup = {"original": "config"}
         backup_path = backup_dir / "opencode-20250101_000000.json"
@@ -297,10 +294,8 @@ class TestInstallDataFlow:
         from apoch.adapters.opencode.config import OpenCodeConfig
         from apoch.adapters.opencode.server import OpenCodeAdapter
 
-        opencode_dir = tmp_path / ".opencode"
-        opencode_dir.mkdir(parents=True)
-        config_path = opencode_dir / "opencode.json"
-        config_path.write_text(json.dumps({"mcpServers": {"existing": {"command": "old"}}}))
+        config_path = tmp_path / "opencode.json"
+        config_path.write_text(json.dumps({"mcp": {"existing": {"command": "old"}}}))
 
         monkeypatch.chdir(tmp_path)
 
@@ -309,8 +304,8 @@ class TestInstallDataFlow:
         # 1. Prepare
         plan = adapter.prepare_install()
         assert plan.backup_path.exists()
-        assert "existing" in plan.current.get("mcpServers", {})
-        assert "apoch" in plan.proposed.get("mcpServers", {})
+        assert "existing" in plan.current.get("mcp", {})
+        assert "apoch" in plan.proposed.get("mcp", {})
 
         # 2. Apply
         adapter.apply_install(plan)
@@ -318,17 +313,18 @@ class TestInstallDataFlow:
         # 3. Verify
         cfg = OpenCodeConfig()
         written = cfg.read()
-        assert "apoch" in written.get("mcpServers", {})
-        assert "existing" in written.get("mcpServers", {})  # preserved
-        assert written["mcpServers"]["apoch"]["command"] == "apoch"
+        assert "apoch" in written.get("mcp", {})
+        assert "existing" in written.get("mcp", {})  # preserved
+        cmd = written["mcp"]["apoch"]["command"]
+        suffix = cmd[-2:]
+        assert suffix == ["mcp", "serve"], f"Command should end with 'mcp serve', got {cmd}"
+        assert isinstance(cmd[0], str) and cmd[0], "Command must be a non-empty string"
 
     def test_uninstall_restores_original(self, tmp_path: Path, monkeypatch) -> None:
         """Full programmatic flow: install then uninstall restores original."""
         from apoch.adapters.opencode.server import OpenCodeAdapter
 
-        opencode_dir = tmp_path / ".opencode"
-        opencode_dir.mkdir(parents=True)
-        config_path = opencode_dir / "opencode.json"
+        config_path = tmp_path / "opencode.json"
         original = {"key": "original_value"}
         config_path.write_text(json.dumps(original))
 
@@ -346,7 +342,7 @@ class TestInstallDataFlow:
 
         cfg = OpenCodeConfig()
         after_install = cfg.read()
-        assert "apoch" in after_install.get("mcpServers", {})
+        assert "apoch" in after_install.get("mcp", {})
 
         # Uninstall — should restore original (before install)
         adapter.uninstall()

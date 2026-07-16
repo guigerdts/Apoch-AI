@@ -12,8 +12,7 @@ import json
 
 def _with_config(tmp_path, monkeypatch) -> None:
     """Create an isolated opencode.json and chdir to tmp_path."""
-    opencode_path = tmp_path / ".opencode" / "opencode.json"
-    opencode_path.parent.mkdir(parents=True)
+    opencode_path = tmp_path / "opencode.json"
     opencode_path.write_text("{}")
     monkeypatch.chdir(tmp_path)
 
@@ -32,8 +31,8 @@ class TestPrepareInstall:
         assert plan.backup_path is not None
         assert isinstance(plan.current, dict)
         assert isinstance(plan.proposed, dict)
-        assert "mcpServers" in plan.proposed
-        assert "apoch" in plan.proposed["mcpServers"]
+        assert "mcp" in plan.proposed
+        assert "apoch" in plan.proposed["mcp"]
 
     def test_prepare_install_creates_backup_file(self, tmp_path, monkeypatch) -> None:
         """prepare_install() writes a backup file on disk."""
@@ -50,20 +49,19 @@ class TestPrepareInstall:
 
         # Write an existing opencode.json with a non-Apoch entry
         existing = {
-            "mcpServers": {
+            "mcp": {
                 "some-tool": {"command": "tool", "args": []},
             },
         }
-        opencode_path = tmp_path / ".opencode" / "opencode.json"
-        opencode_path.parent.mkdir(parents=True)
+        opencode_path = tmp_path / "opencode.json"
         opencode_path.write_text(json.dumps(existing))
         monkeypatch.chdir(tmp_path)
 
         adapter = OpenCodeAdapter(config={})
         plan = adapter.prepare_install()
 
-        assert "some-tool" in plan.proposed["mcpServers"]
-        assert "apoch" in plan.proposed["mcpServers"]
+        assert "some-tool" in plan.proposed["mcp"]
+        assert "apoch" in plan.proposed["mcp"]
         assert plan.current == existing
 
 
@@ -74,8 +72,7 @@ class TestApplyInstall:
         """apply_install() persists the proposed config to disk."""
         from apoch.adapters.opencode.server import InstallPlan, OpenCodeAdapter
 
-        opencode_path = tmp_path / ".opencode" / "opencode.json"
-        opencode_path.parent.mkdir(parents=True)
+        opencode_path = tmp_path / "opencode.json"
         opencode_path.write_text("{}")  # Must exist for _path_from_cwd to find it
         monkeypatch.chdir(tmp_path)
 
@@ -84,14 +81,14 @@ class TestApplyInstall:
         plan = InstallPlan(
             backup_path=backup_path,
             current={},
-            proposed={"mcpServers": {"apoch": {"command": "apoch", "args": ["mcp"]}}},
+            proposed={"mcp": {"apoch": {"command": ["apoch", "mcp", "serve"], "type": "local"}}},
         )
         adapter = OpenCodeAdapter(config={})
         adapter.apply_install(plan)
 
         written = json.loads(opencode_path.read_text())
-        assert "apoch" in written["mcpServers"]
-        assert written["mcpServers"]["apoch"]["command"] == "apoch"
+        assert "apoch" in written["mcp"]
+        assert written["mcp"]["apoch"]["command"] == ["apoch", "mcp", "serve"]
 
 
 class TestDiscardInstall:
@@ -133,11 +130,11 @@ class TestUninstall:
         from apoch.adapters.opencode.server import OpenCodeAdapter
 
         # Set up a real backup directory
-        opencode_path = tmp_path / ".opencode" / "opencode.json"
-        opencode_path.parent.mkdir(parents=True)
-        opencode_path.write_text(json.dumps({"mcpServers": {"apoch": {"command": "apoch"}}}))
+        opencode_path = tmp_path / "opencode.json"
+        config_data = {"mcp": {"apoch": {"command": ["apoch", "mcp", "serve"], "type": "local"}}}
+        opencode_path.write_text(json.dumps(config_data))
 
-        backup_dir = opencode_path.parent / ".apoch-backups"
+        backup_dir = tmp_path / ".apoch-backups"
         backup_dir.mkdir(parents=True)
         backup_path = backup_dir / "opencode-20250101_000000.json"
         backup_path.write_text(json.dumps({"original": "config"}))
@@ -154,8 +151,7 @@ class TestUninstall:
         """uninstall() is a no-op when no backups exist."""
         from apoch.adapters.opencode.server import OpenCodeAdapter
 
-        opencode_path = tmp_path / ".opencode" / "opencode.json"
-        opencode_path.parent.mkdir(parents=True)
+        opencode_path = tmp_path / "opencode.json"
         opencode_path.write_text(json.dumps({"apoch": "installed"}))
 
         monkeypatch.chdir(tmp_path)

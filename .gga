@@ -1,0 +1,6 @@
+PROVIDER="opencode"
+FILE_PATTERNS="*.py,*.ts,*.sh,*.yaml"
+EXCLUDE_PATTERNS="*.pyc,__pycache__,.venv,venv,node_modules,dist"
+RULES_FILE="AGENTS.md"
+STRICT_MODE="true"
+TIMEOUT="300"

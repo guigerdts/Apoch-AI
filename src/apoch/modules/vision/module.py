@@ -244,11 +244,11 @@ class VisionModule(Module):
             entries = [e for e in entries if e.level.upper() == level.upper()]
         return entries[:limit]
 
-    async def module_state(self, name: str | None = None) -> dict:
+    async def module_state(self, module: str | None = None) -> dict:
         """Return current state for all modules, or a single module.
 
         Args:
-            name: Optional module name.  ``None`` returns all states.
+            module: Optional module name.  ``None`` returns all states.
 
         Returns:
             Dict mapping name → ``state.value``.  Empty dict if no registry.
@@ -256,18 +256,18 @@ class VisionModule(Module):
         if self._registry is None:
             return {}
         modules = self._registry.loaded
-        if name is not None:
-            mod = modules.get(name)
+        if module is not None:
+            mod = modules.get(module)
             if mod is None:
-                return {name: {"not_found": True}}
-            return {name: mod.state.value}
+                return {module: {"not_found": True}}
+            return {module: mod.state.value}
         return {n: m.state.value for n, m in modules.items()}
 
-    async def module_config(self, name: str | None = None) -> dict:
+    async def module_config(self, module: str | None = None) -> dict:
         """Return effective config for a module (via registry).
 
         Args:
-            name: Optional module name.  ``None`` returns all configs.
+            module: Optional module name.  ``None`` returns all configs.
 
         Returns:
             Dict mapping name → ``_config`` dict.  Empty dict if no registry.
@@ -275,11 +275,11 @@ class VisionModule(Module):
         if self._registry is None:
             return {}
         modules = self._registry.loaded
-        if name is not None:
-            mod = modules.get(name)
+        if module is not None:
+            mod = modules.get(module)
             if mod is None:
-                return {name: {"not_found": True}}
-            return {name: mod._config}
+                return {module: {"not_found": True}}
+            return {module: mod._config}
         return {n: m._config for n, m in modules.items()}
 
     async def system_info(self) -> SystemInfo:

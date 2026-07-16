@@ -25,6 +25,18 @@ def _build_manager() -> AgentAdapterManager:
 
 
 @cli_app.command()
+def serve() -> None:
+    """Run the MCP gateway (blocking, stdio transport)."""
+    manager = _build_manager()
+    try:
+        asyncio.run(manager.serve())
+    except KeyboardInterrupt:
+        typer.echo()
+        typer.echo("MCP gateway stopped")
+        raise SystemExit(0)
+
+
+@cli_app.command()
 def start() -> None:
     """Start the MCP gateway with module tool registration."""
     manager = _build_manager()

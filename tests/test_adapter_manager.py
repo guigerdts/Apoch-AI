@@ -75,7 +75,7 @@ class TestAgentAdapterManager:
         assert adapter.stop.call_count == 1
 
     def test_start_registers_tools_from_modules(self) -> None:
-        """Manager discovers and registers tools from all loaded modules."""
+        """Manager discovers and registers module tools (no coordinator tools in PR1B)."""
         import asyncio
 
         from apoch.adapters.manager import AgentAdapterManager
@@ -96,15 +96,14 @@ class TestAgentAdapterManager:
 
         asyncio.run(_run())
 
-        # Should register tools in alphabetical module order
+        # No coordinator tools in PR1B — only module tools in alpha order
         assert adapter.register_module_tools.call_count == 2
         call_args_list = adapter.register_module_tools.call_args_list
-        # First call: chronicle (alpha before vision), then vision
         assert call_args_list[0][0][0] == "chronicle"
         assert call_args_list[1][0][0] == "vision"
 
     def test_start_without_tools_does_not_register(self) -> None:
-        """Modules without get_tool_defs are skipped."""
+        """Modules without get_tool_defs are skipped; no coordinator tools in PR1B."""
         import asyncio
 
         from apoch.adapters.manager import AgentAdapterManager
@@ -124,4 +123,5 @@ class TestAgentAdapterManager:
 
         asyncio.run(_run())
 
+        # No coordinator tools in PR1B, no module tools — nothing registered
         adapter.register_module_tools.assert_not_called()

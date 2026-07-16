@@ -11,8 +11,11 @@ Every public method is designed to be:
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 import logging
+import shutil
+import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -112,6 +115,24 @@ class OpenCodeAdapter(AgentAdapter):
         self._server = FastMCP(name, warn_on_duplicate_tools=False)
         self._started_at = time.monotonic()
         logger.info("OpenCode gateway started (name=%s)", name)
+
+    async def serve(self) -> None:
+        """Run the MCP gateway (blocking, stdio transport).
+
+        Ensures the gateway is started (idempotent), then enters the
+        stdio transport loop which blocks until cancelled.
+
+        Raises:
+            asyncio.CancelledError: On graceful shutdown (caller is
+                expected to catch and handle cleanup).
+        """
+        await self.start()
+        logger.info("OpenCode gateway entering stdio transport loop...")
+        try:
+            await self._server.run_stdio_async()
+        except asyncio.CancelledError:
+            logger.info("OpenCode gateway serve() cancelled — transport loop exiting")
+            raise
 
     async def stop(self) -> None:
         """Stop the FastMCP gateway.
@@ -232,8 +253,7 @@ class OpenCodeAdapter(AgentAdapter):
         if not callable(handler):
             raise ToolExecutionError(
                 code=ToolExecutionError.HANDLER_NOT_FOUND,
-                message=f"Handler '{name}' on module "
-                f"'{type(module).__name__}' is not callable.",
+                message=f"Handler '{name}' on module '{type(module).__name__}' is not callable.",
             )
 
     # ------------------------------------------------------------------
@@ -259,9 +279,13 @@ class OpenCodeAdapter(AgentAdapter):
                 },
             }
 
+        # Strip None values: FastMCP inserts None for optional params the
+        # user didn't provide, but jsonschema rejects None vs e.g. type:string.
+        clean_kwargs = {k: v for k, v in kwargs.items() if v is not None}
+
         # Validate kwargs against JSON Schema.
         try:
-            js_validate(instance=kwargs, schema=slot.schema)
+            js_validate(instance=clean_kwargs, schema=slot.schema)
         except ValidationError as exc:
             return {
                 "version": 1,
@@ -281,12 +305,13 @@ class OpenCodeAdapter(AgentAdapter):
                 },
             }
 
-        # Dispatch — sync or async.
+        # Dispatch — sync or async (use cleaned kwargs so optional params
+        # with a default are absent and fall through to their default).
         try:
             if inspect.iscoroutinefunction(slot.handler):
-                result = await slot.handler(**kwargs)
+                result = await slot.handler(**clean_kwargs)
             else:
-                result = slot.handler(**kwargs)
+                result = slot.handler(**clean_kwargs)
         except ToolExecutionError as exc:
             return {
                 "version": 1,
@@ -356,6 +381,44 @@ class OpenCodeAdapter(AgentAdapter):
     # Install / Uninstall (synchronous config management)
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _resolve_apoch_command() -> list[str]:
+        """Resolve the absolute path to the ``apoch`` CLI.
+
+        Priority:
+          1. Venv sibling of ``sys.executable`` — local venv (uv sync).
+          2. ``shutil.which("apoch")`` — global install (pipx, uv tool).
+          3. ``uv run`` — safety net if neither is available.
+          4. Bare ``apoch`` — fallback with warning.
+        """
+        candidates: list[list[str]] = []
+
+        # 1. Venv sibling  (sys.executable -> .venv/bin/python3 -> .venv/bin/apoch)
+        venv_sibling = Path(sys.executable).parent / "apoch"
+        if venv_sibling.exists():
+            candidates.append([str(venv_sibling)])
+
+        # 2. Global PATH
+        global_path = shutil.which("apoch")
+        if global_path:
+            candidates.append([global_path])
+
+        # 3. uv run as safety net
+        uv_path = shutil.which("uv")
+        if uv_path:
+            candidates.append([uv_path, "run", "--directory", str(Path.cwd()), "apoch"])
+
+        if not candidates:
+            logger.warning(
+                "Could not resolve apoch path — install may fail if "
+                "apoch is not in $PATH"
+            )
+            return ["apoch"]
+
+        chosen = candidates[0]
+        logger.info("Resolved apoch command: %s", chosen)
+        return chosen
+
     def prepare_install(self) -> InstallPlan:
         """Back up current config and compute the proposed change.
 
@@ -370,7 +433,7 @@ class OpenCodeAdapter(AgentAdapter):
 
         cfg = OpenCodeConfig()
         current = cfg.read()
-        proposed = cfg.merge(current)
+        proposed = cfg.merge(current, self._resolve_apoch_command())
         backup_path = cfg.backup()
         return InstallPlan(backup_path=backup_path, current=current, proposed=proposed)
 
@@ -425,4 +488,3 @@ class OpenCodeAdapter(AgentAdapter):
         cfg.rollback(latest)
         latest.unlink()
         logger.info("Uninstall complete — restored from: %s", latest)
-

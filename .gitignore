@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.pytest_cache/
+.ruff_cache/
+
+# Virtual environment
+.venv/
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Code intelligence
+.codegraph/
+
+# Local config
+.env
+.env.local
+
+# Artifacts
+.coverage
+.gga/
+.openclaw/
+.atl/
+
+# Openspec archive
+openspec/changes/archive/
+
+# Apoch-AI backups
+.apoch-backups/
+docs/audit-report.md
+PR13_EVIDENCE.md

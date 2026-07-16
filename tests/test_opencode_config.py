@@ -69,10 +69,10 @@ class TestOpenCodeConfigRead:
         from apoch.adapters.opencode.config import OpenCodeConfig
 
         path = tmp_path / "opencode.json"
-        path.write_text(json.dumps({"mcpServers": {}}))
+        path.write_text(json.dumps({"mcp": {}}))
         cfg = OpenCodeConfig(path=path)
         result = cfg.read()
-        assert "mcpServers" in result
+        assert "mcp" in result
 
     def test_read_invalid_json_raises_error(self, tmp_path: Path) -> None:
         """read() raises OpenCodeConfigError on invalid JSON."""
@@ -95,7 +95,7 @@ class TestOpenCodeConfigWrite:
 
         path = tmp_path / "opencode.json"
         cfg = OpenCodeConfig(path=path)
-        cfg.write({"mcpServers": {"apoch": {"command": "apoch", "args": ["mcp"]}}})
+        cfg.write({"mcp": {"apoch": {"command": ["apoch", "mcp", "serve"], "type": "local"}}})
         assert path.exists()
 
     def test_write_content_is_valid_json(self, tmp_path: Path) -> None:
@@ -103,7 +103,7 @@ class TestOpenCodeConfigWrite:
         from apoch.adapters.opencode.config import OpenCodeConfig
 
         path = tmp_path / "opencode.json"
-        expected = {"mcpServers": {"apoch": {"command": "apoch", "args": ["mcp"]}}}
+        expected = {"mcp": {"apoch": {"command": ["apoch", "mcp", "serve"], "type": "local"}}}
         cfg = OpenCodeConfig(path=path)
         cfg.write(expected)
         parsed = json.loads(path.read_text())
@@ -116,22 +116,22 @@ class TestOpenCodeConfigWrite:
         path = tmp_path / "opencode.json"
         existing = {
             "otherTool": {"setting": 42},
-            "mcpServers": {"other_server": {"command": "other"}},
+            "mcp": {"other_server": {"command": "other"}},
         }
         path.write_text(json.dumps(existing))
 
         cfg = OpenCodeConfig(path=path)
         # Need to merge, not just write
         current = cfg.read()
-        current.setdefault("mcpServers", {})["apoch"] = {
-            "command": "apoch",
-            "args": ["mcp"],
+        current.setdefault("mcp", {})["apoch"] = {
+            "command": ["apoch", "mcp", "serve"],
+            "type": "local",
         }
         cfg.write(current)
         parsed = json.loads(path.read_text())
         assert parsed["otherTool"]["setting"] == 42
-        assert "other_server" in parsed["mcpServers"]
-        assert "apoch" in parsed["mcpServers"]
+        assert "other_server" in parsed["mcp"]
+        assert "apoch" in parsed["mcp"]
 
 
 class TestOpenCodeConfigValidate:
@@ -144,15 +144,15 @@ class TestOpenCodeConfigValidate:
         cfg = OpenCodeConfig()
         errors = cfg.validate(
             {
-                "mcpServers": {
-                    "apoch": {"command": "apoch", "args": ["mcp"]},
+                "mcp": {
+                    "apoch": {"command": ["apoch", "mcp", "serve"], "type": "local"},
                 },
             }
         )
         assert errors == []
 
-    def test_validate_missing_mcp_servers(self) -> None:
-        """validate() flags missing mcpServers key."""
+    def test_validate_missing_mcp(self) -> None:
+        """validate() flags missing mcp key."""
         from apoch.adapters.opencode.config import OpenCodeConfig
 
         cfg = OpenCodeConfig()
@@ -160,11 +160,11 @@ class TestOpenCodeConfigValidate:
         assert len(errors) > 0
 
     def test_validate_missing_apoch_entry(self) -> None:
-        """validate() flags missing apoch entry in mcpServers."""
+        """validate() flags missing apoch entry in mcp."""
         from apoch.adapters.opencode.config import OpenCodeConfig
 
         cfg = OpenCodeConfig()
-        errors = cfg.validate({"mcpServers": {}})
+        errors = cfg.validate({"mcp": {}})
         assert len(errors) > 0
 
 
@@ -178,8 +178,8 @@ class TestOpenCodeConfigMerge:
         path = tmp_path / "opencode.json"
         cfg = OpenCodeConfig(path=path)
         result = cfg.merge({})
-        assert "mcpServers" in result
-        assert "apoch" in result["mcpServers"]
+        assert "mcp" in result
+        assert "apoch" in result["mcp"]
 
     def test_merge_preserves_existing_servers(self, tmp_path: Path) -> None:
         """merge() does not remove existing MCP servers."""
@@ -189,15 +189,15 @@ class TestOpenCodeConfigMerge:
         path.write_text(
             json.dumps(
                 {
-                    "mcpServers": {"existing": {"command": "tool"}},
+                    "mcp": {"existing": {"command": "tool"}},
                 }
             )
         )
         cfg = OpenCodeConfig(path=path)
         current = cfg.read()
         result = cfg.merge(current)
-        assert "existing" in result["mcpServers"]
-        assert "apoch" in result["mcpServers"]
+        assert "existing" in result["mcp"]
+        assert "apoch" in result["mcp"]
 
     def test_merge_idempotent(self, tmp_path: Path) -> None:
         """merge() applied twice produces the same result."""

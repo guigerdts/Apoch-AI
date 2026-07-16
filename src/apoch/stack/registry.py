@@ -100,7 +100,7 @@ class StackRegistry:
                 try:
                     cls = ep.load()
                     instance = cls()
-                    self._descriptors[ep.name] = instance.descriptor
+                    self._descriptors[instance.descriptor.name] = instance.descriptor
                     count += 1
                     log.info(
                         "Component discovered via entry point",
