@@ -25,18 +25,24 @@ from apoch.core.exceptions import OpenCodeConfigError
 logger = logging.getLogger(__name__)
 
 # Default opencode.json location (relative to project root or $HOME)
-_DEFAULT_OPENCODE_PATH = Path(".opencode/opencode.json")
+_DEFAULT_OPENCODE_PATH = Path("opencode.json")  # not .opencode/opencode.json
 
 # JSONC comment detection — files containing these patterns are treated as JSONC
 _JSONC_PATTERN = re.compile(r"^\s*(//|/\*)")
+# JSON block comment start at beginning of line (NOT inside a JSON string)
+_BLOCK_COMMENT_START = re.compile(r"^\s*/\*")
 
 
 def _looks_like_jsonc(raw: str) -> bool:
-    """Return True if *raw* appears to contain JSONC-style comments."""
+    """Return True if *raw* appears to contain JSONC-style comments.
+
+    Detects ``//`` or ``/*`` at the START of a line only — glob patterns
+    like ``**/*.key`` inside JSON string values are NOT mistaken for comments.
+    """
     for line in raw.splitlines():
         if _JSONC_PATTERN.match(line):
             return True
-    return "/*" in raw and "*/" in raw
+    return False
 
 
 class OpenCodeConfig:
@@ -88,7 +94,7 @@ class OpenCodeConfig:
             cleaned = raw
 
         try:
-            return json.loads(cleaned)
+            return json.loads(_strip_trailing_commas(cleaned))
         except json.JSONDecodeError as exc:
             raise OpenCodeConfigError(f"Invalid JSON in {self._path}: {exc}") from exc
 
@@ -140,18 +146,18 @@ class OpenCodeConfig:
             errors.append("Root value must be a JSON object")
             return errors
 
-        servers = data.get("mcpServers")
+        servers = data.get("mcp")
         if servers is None:
-            errors.append("Missing required key: 'mcpServers'")
+            errors.append("Missing required key: 'mcp'")
             return errors
 
         if not isinstance(servers, dict):
-            errors.append("'mcpServers' must be a JSON object")
+            errors.append("'mcp' must be a JSON object")
             return errors
 
         apoch_entry = servers.get("apoch")
         if apoch_entry is None:
-            errors.append("Missing required entry 'apoch' under 'mcpServers'")
+            errors.append("Missing required entry 'apoch' under 'mcp'")
             return errors
 
         if not isinstance(apoch_entry, dict):
@@ -171,18 +177,17 @@ class OpenCodeConfig:
         """Add or update the Apoch-AI entry in *current*, preserving all other keys.
 
         The returned dict is a deep-enough copy — existing MCP servers
-        are preserved, and only the ``apoch`` entry under
-        ``mcpServers`` is added/updated.
+        are preserved, and only the ``apoch`` entry under ``mcp``
+        is added/updated.
         """
         result: dict[str, Any] = dict(current)
 
-        servers: dict[str, Any] = dict(result.get("mcpServers", {}))
-        servers["apoch"] = {
-            "command": "apoch",
-            "args": ["mcp"],
-            "description": "Apoch-AI MCP gateway",
+        mcp_servers: dict[str, Any] = dict(result.get("mcp", {}))
+        mcp_servers["apoch"] = {
+            "command": ["apoch", "mcp", "serve"],
+            "type": "local",
         }
-        result["mcpServers"] = servers
+        result["mcp"] = mcp_servers
 
         return result
 
@@ -243,15 +248,23 @@ class OpenCodeConfig:
 def _path_from_cwd() -> Path:
     """Resolve the default opencode.json path from the current directory.
 
-    Walks up from CWD looking for ``.opencode/opencode.json``.  Falls
-    back to ``~/.opencode/opencode.json``.
+    Priority:
+      1. Project root: <cwd>/opencode.json (walking up)
+      2. Global config: ~/.config/opencode/opencode.json
     """
     cwd = Path.cwd()
     for parent in [cwd] + list(cwd.parents):
-        candidate = parent / ".opencode" / "opencode.json"
+        candidate = parent / "opencode.json"
         if candidate.exists():
             return candidate
-    return Path.home() / ".opencode" / "opencode.json"
+    return Path.home() / ".config" / "opencode" / "opencode.json"
+
+
+def _strip_trailing_commas(text: str) -> str:
+    """Remove trailing commas before closing braces/brackets."""
+    text = re.sub(r",\s*}", "}", text)
+    text = re.sub(r",\s*]", "]", text)
+    return text
 
 
 def _strip_jsonc_comments(raw: str) -> str:
@@ -270,10 +283,10 @@ def _strip_jsonc_comments(raw: str) -> str:
             continue
         if stripped.startswith("//"):
             continue
-        if "/*" in stripped:
+        if _BLOCK_COMMENT_START.match(stripped):
             start = stripped.find("/*")
             before = stripped[:start]
-            if before:
+            if before and before.strip():
                 lines.append(before)
             in_block = "*/" not in stripped[start + 2 :]
             continue

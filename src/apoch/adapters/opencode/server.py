@@ -11,6 +11,7 @@ Every public method is designed to be:
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 import logging
 import time
@@ -112,6 +113,24 @@ class OpenCodeAdapter(AgentAdapter):
         self._server = FastMCP(name, warn_on_duplicate_tools=False)
         self._started_at = time.monotonic()
         logger.info("OpenCode gateway started (name=%s)", name)
+
+    async def serve(self) -> None:
+        """Run the MCP gateway (blocking, stdio transport).
+
+        Ensures the gateway is started (idempotent), then enters the
+        stdio transport loop which blocks until cancelled.
+
+        Raises:
+            asyncio.CancelledError: On graceful shutdown (caller is
+                expected to catch and handle cleanup).
+        """
+        await self.start()
+        logger.info("OpenCode gateway entering stdio transport loop...")
+        try:
+            await self._server.run_stdio_async()
+        except asyncio.CancelledError:
+            logger.info("OpenCode gateway serve() cancelled — transport loop exiting")
+            raise
 
     async def stop(self) -> None:
         """Stop the FastMCP gateway.
@@ -232,8 +251,7 @@ class OpenCodeAdapter(AgentAdapter):
         if not callable(handler):
             raise ToolExecutionError(
                 code=ToolExecutionError.HANDLER_NOT_FOUND,
-                message=f"Handler '{name}' on module "
-                f"'{type(module).__name__}' is not callable.",
+                message=f"Handler '{name}' on module '{type(module).__name__}' is not callable.",
             )
 
     # ------------------------------------------------------------------
@@ -425,4 +443,3 @@ class OpenCodeAdapter(AgentAdapter):
         cfg.rollback(latest)
         latest.unlink()
         logger.info("Uninstall complete — restored from: %s", latest)
-

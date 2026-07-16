@@ -15,7 +15,7 @@ Apoch-AI is **not** a coding agent, an LLM, a model provider, or an IDE. It is a
 - **Cross-Platform** — macOS, Linux, Windows (WSL), and Termux (Android).
 - **Agent-Agnostic** — Works with any AI coding agent. Version 1 targets OpenCode.
 - **Spec-Driven Development** — Every feature follows OpenSpec methodology: Proposal → Spec → Design → Tasks → Apply → Verify → Archive.
-- **401 Tests** — Comprehensive test suite with MockRunner-based lifecycle testing across all components.
+- **1,156 Tests** (1,148 pass, 8 CI-only skip) — Comprehensive test suite with MockRunner-based lifecycle testing, E2E real-tool validation, and cross-platform CI.
 
 ---
 
@@ -90,14 +90,26 @@ See [Architecture Overview](docs/architecture.md) for the full design.
 | `apoch stack uninstall [components...]` | Uninstall one or all components |
 | `apoch stack verify [components...] [--skip-async]` | Verify component installations |
 
-### Other Commands
+### MCP Gateway Commands
+
+| Command | Description |
+|---------|-------------|
+| `apoch mcp start` | Start the MCP gateway with module tool registration |
+| `apoch mcp stop` | Stop the MCP gateway |
+| `apoch mcp restart` | Restart the MCP gateway |
+| `apoch mcp serve` | Run the MCP gateway (blocking, stdio transport — for OpenCode integration) |
+
+### Engine Intelligence Commands
 
 | Command | Description |
 |---------|-------------|
 | `apoch status` | Show system health and module statistics |
 | `apoch list [--verbose] [--format text\|json]` | List all discovered modules |
-| `apoch mcp start\|stop\|restart` | Manage the MCP gateway |
 | `apoch doctor` | Run system diagnostics |
+| `apoch eil status` | Show engine module states |
+| `apoch eil hypotheses` | Show optimizer-generated optimization hypotheses |
+| `apoch eil recs` | Show oracle strategic recommendations |
+| `apoch eil trends` | Show pulse performance trend analysis |
 
 See [CLI Reference](docs/cli.md) for complete documentation with examples.
 
@@ -120,22 +132,24 @@ See [Adapters Reference](docs/adapters.md) for per-component details.
 
 ### Native Modules
 
-| Module | Status | Description |
-|--------|--------|-------------|
-| **Chronicle** | ✅ Stable | Activity recording and timeline generation |
-| **Guardian** | ✅ Stable | Exception isolation and execution boundaries |
-| **Vision** | ✅ Stable | Observability suite (logging, introspection, metrics) |
-| **Oracle** | ⏳ In development | Decision analysis and reasoning |
-| **Pulse** | ⏳ In development | Performance benchmarking |
-| **Optimizer** | ⏳ In development | Context and token optimization |
+| Module | Status | MCP Tools | Description |
+|--------|--------|-----------|-------------|
+| **Chronicle** | ✅ Stable | 3 tools | Activity recording and timeline generation via SQLite |
+| **Guardian** | ✅ Stable | 4 tools | Exception isolation and execution boundaries |
+| **Vision** | ✅ Stable | 4 tools | Observability suite (logging, introspection, system info) |
+| **Oracle** | ⚡ Functional | — (services) | Decision analysis and recommendation engine |
+| **Pulse** | ⚡ Functional | — (services) | Performance telemetry and work-unit tracking |
+| **Optimizer** | ⚡ Functional | — (services) | Anomaly detection and code quality analysis |
 
 ---
 
 ## Project Status
 
-**Current release:** `v0.1.0` — Core Stack stable with four adapters and three stable native modules.
+**Current release:** `v0.7.0-alpha` — Core Stack stable with six functional engine modules, E2E test suite, cross-platform CI/CD, and OpenCode MCP integration.
 
 **Milestone #1:** Ecosystem Adapters — ✅ Completed (OpenSpec, Engram, Context7, CodeGraph)
+
+**Milestone #2:** Engine Intelligence Layer — ⚡ 6 modules functional, data ingestion pipeline pending
 
 The Core Stack infrastructure is **frozen** — no architectural changes will be made. New
 components are integration work only, following the [Reference Component Rule](docs/contributing.md#reference-component-rule).

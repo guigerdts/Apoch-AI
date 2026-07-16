@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.8.0-alpha] — 2026-07-16
+
+### Fixed (Critical Blockers)
+
+- **Registry Key Mismatch** (`stack/registry.py`): `discover()` stored components under `ep.name` (lowercase) while `register()` and `get()` used `descriptor.name` (display case). Changed `discover()` to key by `instance.descriptor.name`. `apoch stack status` and `stack verify` now work correctly for all 4 components.
+- **MCP Transport Loop** (`adapters/opencode/server.py`, `adapters/manager.py`, `cli/mcp.py`): Added `serve()` method to both `OpenCodeAdapter` and `AgentAdapterManager`, plus `apoch mcp serve` CLI command. The server now calls `FastMCP.run_stdio_async()` to actually serve MCP requests via stdio transport — previous process exited immediately after tool registration.
+- **MCP Dispatch Parameter Mismatches** (`modules/chronicle/module.py`, `modules/vision/module.py`): 4 handler-vs-ToolDef property name conflicts fixed. `chronicle_record` now wraps `record()` with flat kwargs, `chronicle_query` wraps `query()` with flat kwargs. `vision_state` and `vision_config` handler params renamed from `name` to `module` to match their ToolDef schemas.
+- **OpenCode Integration** (`adapters/opencode/config.py`): Three blockers fixed:
+  - Config path: searches for `opencode.json` in project root instead of `.opencode/opencode.json`; fallback to `~/.config/opencode/opencode.json` instead of `~/.opencode/opencode.json`
+  - Config key: writes Apoch entry under `"mcp"` instead of `"mcpServers"`, using `"command": ["apoch", "mcp", "serve"]` array format with `"type": "local"` — matching OpenCode's MCP server format
+  - Trailing comma handling: added `_strip_trailing_commas()` helper to clean trailing commas before JSON parse, preventing `json.JSONDecodeError` on malformed config files
+
+### Fixed (Inconsistencies)
+
+- **codegraph.py tracked**: Added `src/apoch/stack/components/codegraph.py` (317 LOC) to version control
+- **.gitignore**: Created with Python project defaults covering `__pycache__`, `.venv`, `.coverage`, `.codegraph/`, build artifacts, and development metadata
+
+### Added
+
+- E2E test suite: 41 real-tool validation tests across OpenSpec, Engram, Context7, CodeGraph
+- CI/CD Matrix: `.github/workflows/ci.yml` (lint/test/e2e on Linux/macOS/Windows) and `.github/workflows/coverage.yml`
+- Coverage infrastructure: pytest-cov with 80% global / 90% stack thresholds, HTML + XML reports, baseline at 91.8% global / 96.6% stack
+
+---
+
 ## [0.7.0-alpha] — 2026-07-14
 
 ### Added

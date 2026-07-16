@@ -112,6 +112,51 @@ class ChronicleModule(Module):
         """Retrieve events matching *event_filter* (default: no filter)."""
         return self._store.query(event_filter or EventFilter())
 
+    # ------------------------------------------------------------------
+    # MCP tool handlers (thin wrappers — adapt individual kwargs to
+    # domain-object signatures for dispatch via _dispatch(**kwargs))
+    # ------------------------------------------------------------------
+
+    async def record_tool(
+        self,
+        source: str,
+        event_type: str,
+        details: dict | None = None,
+    ) -> dict:
+        """Tool handler for chronicle_record — wraps record()."""
+        import uuid
+        from datetime import UTC, datetime
+
+        event = ActivityEvent(
+            id=uuid.uuid4().hex,
+            timestamp=datetime.now(UTC).isoformat(),
+            type=event_type,
+            source=source,
+            severity="info",
+            payload=details or {},
+        )
+        await self.record(event)
+        return {"ok": True, "id": event.id}
+
+    async def query_tool(
+        self,
+        source: str | None = None,
+        event_type: str | None = None,
+        since: str | None = None,
+        until: str | None = None,
+        limit: int = 100,
+    ) -> dict:
+        """Tool handler for chronicle_query — wraps query()."""
+        event_filter = EventFilter(
+            type=event_type,  # ToolDef uses "event_type"; EventFilter uses "type"
+            source=source,
+            since=since,
+            until=until,
+            limit=limit,
+        )
+        results = await self.query(event_filter)
+        return {"ok": True, "count": len(results), "events": results}
+
     async def prune(self, before: str) -> int:
         """Delete events older than *before* (ISO 8601).
 
@@ -172,7 +217,7 @@ class ChronicleModule(Module):
                     },
                     "required": ["source", "event_type"],
                 },
-                handler_name="record",
+                handler_name="record_tool",
             ),
             ToolDef(
                 name="chronicle_query",
@@ -205,7 +250,7 @@ class ChronicleModule(Module):
                         },
                     },
                 },
-                handler_name="query",
+                handler_name="query_tool",
             ),
             ToolDef(
                 name="chronicle_stats",

@@ -114,4 +114,18 @@ class AgentAdapterManager:
         await self._adapter.stop()
         await self._engine.stop()
         self._engine = None
+
+    async def serve(self) -> None:
+        """Start and run the MCP gateway (blocking, stdio transport).
+
+        Calls ``start()`` (which is idempotent and registers all
+        module tools), then enters the stdio transport loop that
+        blocks until cancelled.
+
+        This is the main entry point for ``apoch mcp serve``.
+        """
+        await self.start()
+        logger.info("AgentAdapterManager entering serve loop...")
+        await self._adapter.serve()
+
         logger.info("AgentAdapterManager stopped")
