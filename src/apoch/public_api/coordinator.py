@@ -766,10 +766,16 @@ class ApochCoordinator:
                 for key, count in type_counts.items()
                 if count > 0
             )
-            summary = (
-                f"Se encontraron {len(events)} eventos "
-                f"({counts_str}) en las últimas {horas} horas"
-            )
+            if counts_str:
+                summary = (
+                    f"Se encontraron {len(events)} eventos "
+                    f"({counts_str}) en las últimas {horas} horas"
+                )
+            else:
+                summary = (
+                    f"Se encontraron {len(events)} eventos "
+                    f"en las últimas {horas} horas"
+                )
             confidence = 0.50
             based_on = f"{len(events)} events"
 
@@ -917,13 +923,18 @@ class ApochCoordinator:
         n_available = sum(1 for v in results.values() if v is not None)
         health_confidence = round(n_available / n_expected, 2)
 
-        return self._build_success_response(
+        # Compute healthy boolean for the response contract (BUG-002).
+        healthy = not has_critical
+
+        resp = self._build_success_response(
             results=results,
             summary=summary,
             explanation=explanation,
             suggested_action=suggested_action,
             confidence=health_confidence,
         )
+        resp["healthy"] = healthy
+        return resp
 
     async def recommend(self) -> dict[str, Any]:
         """Next action recommendation over the Apoch-AI platform.

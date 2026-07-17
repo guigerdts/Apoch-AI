@@ -112,7 +112,9 @@ class TestAgentAdapterABC:
             class _BadAdapter(AgentAdapter):  # type: ignore[abstract]
                 async def start(self) -> None: ...
                 async def stop(self) -> None: ...
-                async def register_module_tools(self, module_name: str, module: object, tools: list) -> None: ...  # noqa: ARG002
+                async def register_module_tools(
+                    self, module_name: str, module: object, tools: list
+                ) -> None: ...  # noqa: ARG002
 
             _BadAdapter(config={})
 
@@ -124,7 +126,9 @@ class TestAgentAdapterABC:
             async def start(self) -> None: ...
             async def stop(self) -> None: ...
             async def health(self): ...
-            async def register_module_tools(self, module_name: str, module: object, tools: list) -> None: ...  # noqa: ARG002
+            async def register_module_tools(
+                self, module_name: str, module: object, tools: list
+            ) -> None: ...  # noqa: ARG002
 
         adapter = _GoodAdapter(config={})
         assert isinstance(adapter, AgentAdapter)
@@ -139,7 +143,9 @@ class TestAgentAdapterABC:
             async def start(self) -> None: ...
             async def stop(self) -> None: ...
             async def health(self): ...
-            async def register_module_tools(self, module_name: str, module: object, tools: list) -> None: ...  # noqa: ARG002
+            async def register_module_tools(
+                self, module_name: str, module: object, tools: list
+            ) -> None: ...  # noqa: ARG002
 
         adapter = _TestAdapter(config={})
         assert asyncio.iscoroutinefunction(adapter.start)

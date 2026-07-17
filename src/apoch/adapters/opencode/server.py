@@ -28,6 +28,7 @@ from pydantic import Field, create_model
 
 from apoch.adapters.base import AgentAdapter, HealthStatus, ToolDef
 from apoch.core.exceptions import ToolExecutionError
+from apoch.public_api.errors import ERR_INVALID_ARGUMENT
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +159,10 @@ class OpenCodeAdapter(AgentAdapter):
         A running gateway with a ``_server`` instance is considered healthy.
         """
         if self._server is None:
-            return HealthStatus(healthy=False, error="gateway not started")
+            return HealthStatus(
+                healthy=False,
+                error="gateway not started — run 'apoch mcp start' or 'apoch mcp serve'",
+            )
         uptime = time.monotonic() - self._started_at if self._started_at else None
         return HealthStatus(healthy=True, uptime_seconds=uptime)
 
@@ -291,7 +295,7 @@ class OpenCodeAdapter(AgentAdapter):
                 "version": 1,
                 "ok": False,
                 "error": {
-                    "code": ToolExecutionError.VALIDATION_ERROR,
+                    "code": ERR_INVALID_ARGUMENT,
                     "message": str(exc),
                 },
             }
@@ -327,6 +331,18 @@ class OpenCodeAdapter(AgentAdapter):
                     "code": ToolExecutionError.INTERNAL_ERROR,
                     "message": f"{type(exc).__name__}: {exc}",
                 },
+            }
+
+        # If the handler returned an error dict, propagate it
+        # instead of wrapping in a success envelope (BUG-001).
+        if isinstance(result, dict) and result.get("ok") is False:
+            return {
+                "version": 1,
+                "ok": False,
+                "error": result.get(
+                    "error",
+                    {"code": ToolExecutionError.INTERNAL_ERROR, "message": "Unknown error"},
+                ),
             }
 
         return {"version": 1, "ok": True, "data": result}

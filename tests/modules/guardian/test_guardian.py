@@ -97,8 +97,12 @@ class TestModuleDiagnostics:
     def test_is_frozen(self):
         """ModuleDiagnostics is immutable."""
         diag = ModuleDiagnostics(
-            module_name="X", current_state="LOADED", last_error=None,
-            last_error_traceback=None, fail_count=0, last_failure_time=None,
+            module_name="X",
+            current_state="LOADED",
+            last_error=None,
+            last_error_traceback=None,
+            fail_count=0,
+            last_failure_time=None,
         )
         with pytest.raises(AttributeError):
             diag.fail_count = 5  # type: ignore[misc]
@@ -106,9 +110,12 @@ class TestModuleDiagnostics:
     def test_nullable_fields_default_to_none(self):
         """last_error, last_error_traceback, last_failure_time may be None."""
         diag = ModuleDiagnostics(
-            module_name="Clean", current_state="RUNNING",
-            last_error=None, last_error_traceback=None,
-            fail_count=0, last_failure_time=None,
+            module_name="Clean",
+            current_state="RUNNING",
+            last_error=None,
+            last_error_traceback=None,
+            fail_count=0,
+            last_failure_time=None,
         )
         assert diag.last_error is None
         assert diag.last_error_traceback is None
@@ -139,7 +146,9 @@ class TestDiagnosticsAPI:
         result["injected"] = None
         assert await guardian.all_diagnostics() == {}
 
-    def test_clear_diagnostics_removes_entry(self, guardian: GuardianModule, broken: _BrokenModule, context: Context):
+    def test_clear_diagnostics_removes_entry(
+        self, guardian: GuardianModule, broken: _BrokenModule, context: Context
+    ):
         """After a failure, clear_diagnostics removes the entry."""
         # Induce a failure
         result = asyncio.run(guardian.protect(broken.start(context), broken))
@@ -154,9 +163,12 @@ class TestDiagnosticsAPI:
         """clear_all_diagnostics() empties the store."""
         # Manually inject a diagnostic to simulate known state
         guardian._diagnostics["M1"] = ModuleDiagnostics(
-            module_name="M1", current_state="FAILED",
-            last_error="err", last_error_traceback="tb",
-            fail_count=1, last_failure_time="now",
+            module_name="M1",
+            current_state="FAILED",
+            last_error="err",
+            last_error_traceback="tb",
+            fail_count=1,
+            last_failure_time="now",
         )
         guardian.clear_all_diagnostics()
         assert await guardian.all_diagnostics() == {}
@@ -175,7 +187,9 @@ class TestProtectSuccess:
     """GuardianModule.protect() — happy path."""
 
     @pytest.mark.asyncio
-    async def test_returns_result_on_success(self, guardian: GuardianModule, healthy: _HealthyModule, context: Context):
+    async def test_returns_result_on_success(
+        self, guardian: GuardianModule, healthy: _HealthyModule, context: Context
+    ):
         """protect() returns coroutine result on success."""
         result = await guardian.protect(healthy.start(context), healthy)
         assert result is None  # start() returns None
@@ -191,7 +205,9 @@ class TestProtectSuccess:
         assert result == 42
 
     @pytest.mark.asyncio
-    async def test_module_state_stays_running(self, guardian: GuardianModule, healthy: _HealthyModule, context: Context):
+    async def test_module_state_stays_running(
+        self, guardian: GuardianModule, healthy: _HealthyModule, context: Context
+    ):
         """After successful protect(), module state is RUNNING."""
         result = await guardian.protect(healthy.start(context), healthy)
         assert result is None  # protect() returns coroutine result
@@ -207,19 +223,25 @@ class TestProtectFailure:
     """GuardianModule.protect() — exception handling."""
 
     @pytest.mark.asyncio
-    async def test_returns_none_on_exception(self, guardian: GuardianModule, broken: _BrokenModule, context: Context):
+    async def test_returns_none_on_exception(
+        self, guardian: GuardianModule, broken: _BrokenModule, context: Context
+    ):
         """protect() returns None when the coroutine raises."""
         result = await guardian.protect(broken.start(context), broken)
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_sets_module_to_failed(self, guardian: GuardianModule, broken: _BrokenModule, context: Context):
+    async def test_sets_module_to_failed(
+        self, guardian: GuardianModule, broken: _BrokenModule, context: Context
+    ):
         """On exception, module transitions to FAILED."""
         await guardian.protect(broken.start(context), broken)
         assert broken.state == ModuleState.FAILED
 
     @pytest.mark.asyncio
-    async def test_captures_last_error(self, guardian: GuardianModule, broken: _BrokenModule, context: Context):
+    async def test_captures_last_error(
+        self, guardian: GuardianModule, broken: _BrokenModule, context: Context
+    ):
         """On exception, last_error captures type and message."""
         await guardian.protect(broken.start(context), broken)
         diag = guardian.diagnostics("_BrokenModule")
@@ -228,7 +250,9 @@ class TestProtectFailure:
         assert "invalid config" in (diag.last_error or "")
 
     @pytest.mark.asyncio
-    async def test_captures_traceback(self, guardian: GuardianModule, broken: _BrokenModule, context: Context):
+    async def test_captures_traceback(
+        self, guardian: GuardianModule, broken: _BrokenModule, context: Context
+    ):
         """On exception, last_error_traceback contains a real traceback."""
         await guardian.protect(broken.start(context), broken)
         diag = guardian.diagnostics("_BrokenModule")
@@ -239,7 +263,9 @@ class TestProtectFailure:
         assert "ValueError" in diag.last_error_traceback
 
     @pytest.mark.asyncio
-    async def test_increments_fail_count(self, guardian: GuardianModule, broken: _BrokenModule, context: Context):
+    async def test_increments_fail_count(
+        self, guardian: GuardianModule, broken: _BrokenModule, context: Context
+    ):
         """Each successive failure increments fail_count."""
         await guardian.protect(broken.start(context), broken)
         diag1 = guardian.diagnostics("_BrokenModule")
@@ -252,7 +278,9 @@ class TestProtectFailure:
         assert diag2.fail_count == 2
 
     @pytest.mark.asyncio
-    async def test_sets_failure_timestamp(self, guardian: GuardianModule, broken: _BrokenModule, context: Context):
+    async def test_sets_failure_timestamp(
+        self, guardian: GuardianModule, broken: _BrokenModule, context: Context
+    ):
         """last_failure_time is set to a valid ISO 8601 timestamp."""
         before = datetime.now(UTC)
         await guardian.protect(broken.start(context), broken)
@@ -264,7 +292,9 @@ class TestProtectFailure:
         assert before <= ts <= after
 
     @pytest.mark.asyncio
-    async def test_protect_does_not_catch_cancelled_error(self, guardian: GuardianModule, context: Context):
+    async def test_protect_does_not_catch_cancelled_error(
+        self, guardian: GuardianModule, context: Context
+    ):
         """CancelledError propagates — Guardian never swallows cancellation."""
 
         async def cancelling_coro() -> None:
@@ -275,7 +305,9 @@ class TestProtectFailure:
             await guardian.protect(cancelling_coro(), mod)
 
     @pytest.mark.asyncio
-    async def test_protect_does_not_catch_keyboard_interrupt(self, guardian: GuardianModule, context: Context):
+    async def test_protect_does_not_catch_keyboard_interrupt(
+        self, guardian: GuardianModule, context: Context
+    ):
         """KeyboardInterrupt propagates — never swallowed."""
 
         async def interrupting_coro() -> None:
@@ -332,7 +364,9 @@ class TestStopClearsDiagnostics:
     """GuardianModule.stop() clears the in-memory diagnostics store."""
 
     @pytest.mark.asyncio
-    async def test_stop_clears_diagnostics(self, guardian: GuardianModule, broken: _BrokenModule, context: Context):
+    async def test_stop_clears_diagnostics(
+        self, guardian: GuardianModule, broken: _BrokenModule, context: Context
+    ):
         """After stop(), diagnostics dict is empty."""
         # Guardian must be RUNNING before we can stop()
         await guardian.start(context)
@@ -340,6 +374,3 @@ class TestStopClearsDiagnostics:
         assert len(await guardian.all_diagnostics()) == 1
         await guardian.stop()
         assert await guardian.all_diagnostics() == {}
-
-
-

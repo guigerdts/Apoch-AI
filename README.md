@@ -35,13 +35,13 @@ git clone https://github.com/guigerdts/Apoch-AI.git
 cd Apoch-AI
 uv sync
 
-# Check component status
+# Check which optional stack components are installed on your system
 uv run apoch stack status
 
-# Install all components
+# Install missing components (CodeGraph, Context7, Engram, OpenSpec)
 uv run apoch stack install
 
-# Verify installations
+# Verify each component responds correctly
 uv run apoch stack verify
 ```
 

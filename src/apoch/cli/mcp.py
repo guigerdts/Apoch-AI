@@ -14,7 +14,9 @@ from apoch.adapters.manager import AgentAdapterManager
 from apoch.adapters.registry import get_adapter
 from apoch.core.registry import ModuleRegistry
 
-cli_app = typer.Typer()
+cli_app = typer.Typer(
+    help="Manage the MCP gateway lifecycle: start, stop, serve, restart.",
+)
 
 
 def _build_manager() -> AgentAdapterManager:

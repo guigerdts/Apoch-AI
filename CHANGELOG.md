@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.9.1-alpha] — 2026-07-17
+
+### Fixed
+
+- **BUG-001: Error double-wrapping in MCP dispatch** — `_dispatch()` now inspects the handler's return value. If the handler returned an error dict (`ok: False`), the error is propagated directly instead of being wrapped in a success envelope. Clients no longer need to check nested `data.ok`. (`server.py:_dispatch()`)
+- **BUG-002: `healthy` field in `apoch_health`** — `health()` now computes and returns `healthy: true` or `healthy: false` depending on whether critical problems exist. Previously the field was absent. (`coordinator.py:health()`)
+- **BUG-003: Empty parentheses in history summary** — When no event types matched the tracked categories (`lifecycle`, `tool`, `error`), the summary displayed empty `()`. Now parentheses are omitted when `counts_str` is empty. (`coordinator.py:history()`)
+- **BUG-005: `VALIDATION_ERROR` not in error catalog** — Schema validation errors in the dispatch layer now use `ERR_INVALID_ARGUMENT` instead of the undocumented `VALIDATION_ERROR`. (`server.py:_dispatch()`)
+
+### Changed
+
+- `pyproject.toml` version bumped from `0.9.0-alpha` to `0.9.1-alpha`
+- `src/apoch/__init__.py.__version__` bumped to `0.9.1-alpha`
+
+### UX Improvements
+
+- `apoch mcp --help` now displays a description: "Manage the MCP gateway lifecycle: start, stop, serve, restart."
+- `apoch doctor` error message for unstarted gateway now suggests the command to run: `"gateway not started — run 'apoch mcp start' or 'apoch mcp serve'"`
+
+### Documentation
+
+- `README.md` quick-start now explains each `apoch stack` command step
+- `docs/mcp-public-api.md` error response format corrected to `{version, ok, error}` envelope
+- `docs/mcp-public-api.md` `apoch_health` examples now include `healthy` field
+- Error catalog documents `ERR_INVALID_ARGUMENT` usage for validation errors
+
+---
+
 ## [0.9.0-alpha] — 2026-07-17
 
 ### Added

@@ -148,6 +148,7 @@ When a tool cannot produce a valid response, it returns:
 
 ```json
 {
+  "version": 1,
   "ok": false,
   "error": {
     "code": "ERR_...",
@@ -156,10 +157,11 @@ When a tool cannot produce a valid response, it returns:
 }
 ```
 
-This is the complete MCP response — no wrapper needed. Defined at `src/apoch/public_api/errors.py:45`.
+The outer envelope uses ``\"version\"`` (envelope version, always 1) and ``\"ok\"`` (always ``false``). The error details live under ``\"error\"``. Defined at `src/apoch/adapters/opencode/server.py:_dispatch()`.
 
 | Field | Always present | Description |
 |---|---|---|
+| `version` | Yes | Envelope version (always 1). |
 | `ok` | Yes | Always `false`. |
 | `error.code` | Yes | One of the 9 error codes from the [Error Catalog](#error-catalog). |
 | `error.message` | Yes | Human-readable explanation, typically in Spanish (the system's default locale). |
@@ -313,6 +315,7 @@ Problems are sorted by severity (CRITICAL/ERROR first, then WARNING). The `sugge
 {
   "api_version": "1.0",
   "summary": "🟢 Sin problemas detectados",
+  "healthy": true,
   "explanation": "No hay problemas registrados en el sistema",
   "evidence": [
     {"source": "Guardian", "confidence": 0.8, "collected_ago": 0, "based_on": "module response"},
@@ -334,6 +337,7 @@ Problems are sorted by severity (CRITICAL/ERROR first, then WARNING). The `sugge
 {
   "api_version": "1.0",
   "summary": "🔴 Se detectaron problemas críticos en el sistema",
+  "healthy": false,
   "explanation": "[ERROR] chronicle: Connection refused to Chronicle store\n[WARNING] pulse: Data lag of 45 seconds detected",
   "evidence": [
     {"source": "Guardian", "confidence": 0.8, "collected_ago": 0, "based_on": "module response"}
