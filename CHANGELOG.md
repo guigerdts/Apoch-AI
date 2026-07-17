@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `pyproject.toml` version bumped from `0.9.0-alpha` to `0.9.1-alpha`
 - `src/apoch/__init__.py.__version__` bumped to `0.9.1-alpha`
 
+- **BUG-008: MCP entry in opencode.json missing `enabled: true`** — `merge()` now writes `"enabled": true` in the Apoch-AI MCP server entry. Without it, OpenCode did not show the server as active after installation, even though it worked. Affects every user who runs `apoch install`. (`config.py:merge()`)
+
 ### UX Improvements
 
 - `apoch mcp --help` now displays a description: "Manage the MCP gateway lifecycle: start, stop, serve, restart."

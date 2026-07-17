@@ -74,6 +74,7 @@ class TestInstallEndToEnd:
                 {
                     "mcp": {
                         "apoch": {
+                            "enabled": True,
                             "command": resolved,
                             "type": "local",
                         },

@@ -196,6 +196,7 @@ class OpenCodeConfig:
 
         mcp_servers: dict[str, Any] = dict(result.get("mcp", {}))
         mcp_servers["apoch"] = {
+            "enabled": True,
             "command": apoch_command + ["mcp", "serve"],
             "type": "local",
         }
