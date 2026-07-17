@@ -15,7 +15,8 @@ Apoch-AI is **not** a coding agent, an LLM, a model provider, or an IDE. It is a
 - **Cross-Platform** — macOS, Linux, Windows (WSL), and Termux (Android).
 - **Agent-Agnostic** — Works with any AI coding agent. Version 1 targets OpenCode.
 - **Spec-Driven Development** — Every feature follows OpenSpec methodology: Proposal → Spec → Design → Tasks → Apply → Verify → Archive.
-- **1,156 Tests** (1,148 pass, 8 CI-only skip) — Comprehensive test suite with MockRunner-based lifecycle testing, E2E real-tool validation, and cross-platform CI.
+- **MCP Public API** — Seven intentionally designed tools (`apoch_status`, `apoch_health`, `apoch_history`, `apoch_recommend`, `apoch_progress`, `apoch_insights`, `apoch_logs`) with response contracts, confidence scoring, and evidence attribution. Backward-compatible legacy aliases for existing integrations.
+- **1,471 Tests** (1,420 pass, 51 CI-only e2e) — Comprehensive test suite covering the public API, stack lifecycle, six native modules, E2E real-tool validation, and MCP protocol testing.
 
 ---
 
@@ -50,10 +51,17 @@ See [Quick Start Guide](docs/quickstart.md) for a detailed walkthrough.
 
 ## Architecture
 
-Apoch-AI is organized into two layers:
+Apoch-AI is organized into three layers:
 
 ```
 ┌─────────────────────────────────────────────────────┐
+│             MCP Public API (intentional)             │
+│  apoch_status · apoch_health · apoch_history        │
+│  apoch_recommend · apoch_progress                   │
+│  apoch_insights · apoch_logs                        │
+│  Legacy aliases (backward compat)                   │
+│  └── ApochCoordinator orchestrates 6 modules        │
+├─────────────────────────────────────────────────────┤
 │                  Core Stack (frozen)                 │
 │  StackManager · StackComponent · StackDescriptor    │
 │  ComponentInfo · ComponentStatus · StackState       │
@@ -130,22 +138,36 @@ All adapters follow the same lifecycle: `detect → install → uninstall → ve
 
 See [Adapters Reference](docs/adapters.md) for per-component details.
 
+### MCP Public Tools
+
+| Tool | Handler | Description |
+|------|---------|-------------|
+| `apoch_status` | `coordinator.status()` | System status — components, problems, recent activity |
+| `apoch_health` | `coordinator.health()` | Diagnostics — active problems, severity, actions |
+| `apoch_history` | `coordinator.history()` | Activity timeline — lifecycle, tool calls, errors |
+| `apoch_recommend` | `coordinator.recommend()` | Highest-impact next action |
+| `apoch_progress` | `coordinator.progress()` | Productivity trends over time periods |
+| `apoch_insights` | `coordinator.insights()` | Detected patterns and improvement opportunities |
+| `apoch_logs` | `coordinator.logs()` | Technical debug logs with level/module filters |
+
+See [MCP Public API Reference](docs/mcp-public-api.md).
+
 ### Native Modules
 
-| Module | Status | MCP Tools | Description |
-|--------|--------|-----------|-------------|
-| **Chronicle** | ✅ Stable | 3 tools | Activity recording and timeline generation via SQLite |
-| **Guardian** | ✅ Stable | 4 tools | Exception isolation and execution boundaries |
-| **Vision** | ✅ Stable | 4 tools | Observability suite (logging, introspection, system info) |
-| **Oracle** | ⚡ Functional | — (services) | Decision analysis and recommendation engine |
-| **Pulse** | ⚡ Functional | — (services) | Performance telemetry and work-unit tracking |
-| **Optimizer** | ⚡ Functional | — (services) | Anomaly detection and code quality analysis |
+| Module | Status | Description |
+|--------|--------|-------------|
+| **Chronicle** | ✅ Stable | Activity recording and timeline generation via SQLite |
+| **Guardian** | ✅ Stable | Exception isolation and execution boundaries |
+| **Vision** | ✅ Stable | Observability suite (logging, introspection, system info) |
+| **Oracle** | ⚡ Functional | Decision analysis and recommendation engine |
+| **Pulse** | ⚡ Functional | Performance telemetry and work-unit tracking |
+| **Optimizer** | ⚡ Functional | Anomaly detection and code quality analysis |
 
 ---
 
 ## Project Status
 
-**Current release:** `v0.7.0-alpha` — Core Stack stable with six functional engine modules, E2E test suite, cross-platform CI/CD, and OpenCode MCP integration.
+**Current release:** `v0.9.0-alpha` — Core Stack stable with six functional engine modules, E2E test suite, cross-platform CI/CD, and OpenCode MCP integration.
 
 **Milestone #1:** Ecosystem Adapters — ✅ Completed (OpenSpec, Engram, Context7, CodeGraph)
 
@@ -162,9 +184,10 @@ See [Roadmap](docs/roadmap.md) for the full development plan.
 
 | User Guide | Developer Guide | Reference |
 |------------|-----------------|-----------|
-| [Installation](docs/installation.md) | [Architecture](docs/architecture.md) | [Core Stack](docs/core-stack.md) |
-| [Quick Start](docs/quickstart.md) | [Development](docs/development.md) | [Adapters](docs/adapters.md) |
-| [CLI Reference](docs/cli.md) | [Testing](docs/testing.md) | [Configuration](docs/configuration.md) |
+| [Installation](docs/installation.md) | [Architecture](docs/architecture.md) | [MCP Public API](docs/mcp-public-api.md) |
+| [Quick Start](docs/quickstart.md) | [Development](docs/development.md) | [Core Stack](docs/core-stack.md) |
+| [CLI Reference](docs/cli.md) | [Testing](docs/testing.md) | [Adapters](docs/adapters.md) |
+| [API Reference](docs/mcp-public-api.md) | [Benchmarks](docs/benchmarks.md) | [Configuration](docs/configuration.md) |
 | [FAQ](docs/faq.md) | [Contributing](docs/contributing.md) | [Changelog Policy](docs/changelog-policy.md) |
 | [Troubleshooting](docs/troubleshooting.md) | [Release Process](docs/release-process.md) | [Creating a New Adapter](docs/creating-a-new-adapter.md) |
 

@@ -2,48 +2,76 @@
 
 Apoch-AI is an agent-agnostic enhancement framework for AI coding agents. It augments agents with persistent capabilities — project memory, engineering governance, runtime observability, and toolchain integration — that they cannot maintain across sessions.
 
-## Two-Layer Structure
+## Three-Layer Structure
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        ADAPTER LAYER (pluggable)                     │
-│                                                                     │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌─────────┐ │
-│  │   OpenSpec   │  │   Engram     │  │  Context7    │  │CodeGraph│ │
-│  │  Component   │  │  Component   │  │  Component   │  │Component│ │
-│  │  (SDD/Specs) │  │  (Memory)    │  │  (Docs AI)   │  │(KG)     │ │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └────┬────┘ │
-│         │                 │                 │               │       │
-│         └─────────────────┴─────────────────┴───────────────┘       │
-│                             StackComponent (ABC)                     │
-├─────────────────────────────────────────────────────────────────────┤
-│                         CORE STACK (frozen)                          │
-│                                                                     │
-│  ┌──────────────┐  ┌────────────────┐  ┌──────────────────────────┐ │
-│  │  StackManager│  │ StackRegistry  │  │  CommandRunner (ABC)     │ │
-│  │  Orchestrator│  │ Entry-Point    │  │  ├─ RealRunner (async)   │ │
-│  │              │  │ Discovery      │  │  └─ MockRunner (tests)   │ │
-│  └──────┬───────┘  └────────────────┘  └──────────────────────────┘ │
-│         │                                                            │
-│  ┌──────┴───────┐  ┌────────────────┐  ┌──────────────────────────┐ │
-│  │  StackState  │  │  ComponentInfo │  │  StackDescriptor         │ │
-│  │  FSM (11 st) │  │  Detect Data   │  │  Static Metadata         │ │
-│  │  derive_state│  │               │  │                          │ │
-│  └──────────────┘  └────────────────┘  └──────────────────────────┘ │
-├─────────────────────────────────────────────────────────────────────┤
-│                         CORE MODULES (native)                        │
-│                                                                     │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐                     │
-│  │  Chronicle │  │  Guardian  │  │   Vision   │  ← STABLE           │
-│  │  (Activity)│  │ (Exception)│  │(Observabil)│                     │
-│  ├────────────┤  ├────────────┤  ├────────────┤                     │
-│  │   Oracle   │  │   Pulse    │  │  Optimizer │  ← IN DEVELOPMENT   │
-│  │ (Decision) │  │(Perf.Metri)│  │ (Token Opt)│                     │
-│  └────────────┘  └────────────┘  └────────────┘                     │
-└─────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                        MCP PUBLIC API (intentional)                       │
+│                                                                          │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────────┐ │
+│  │ apoch_status │  │ apoch_health│  │apoch_history│  │apoch_recommend │ │
+│  │ (No params)  │  │ (No params) │  │horas/tipo   │  │ (No params)    │ │
+│  ├─────────────┤  ├─────────────┤  ├─────────────┤  ├────────────────┤ │
+│  │apoch_progress│  │apoch_insights│  │ apoch_logs  │  │ Legacy Aliases │ │
+│  │   periodo    │  │ (No params) │  │nivel/limite │  │ (5 aliases)    │ │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └───────┬────────┘ │
+│         │                │                │                  │          │
+│         └────────────────┴────────────────┴──────────────────┘          │
+│                        ApochCoordinator                                  │
+│          Orchestrates 6 modules, aggregates responses, builds           │
+│          ToolResponse with confidence scoring + evidence                 │
+├──────────────────────────────────────────────────────────────────────────┤
+│                         CORE STACK (frozen)                              │
+│                                                                          │
+│  ┌──────────────┐  ┌────────────────┐  ┌──────────────────────────────┐ │
+│  │  StackManager│  │ StackRegistry  │  │  CommandRunner (ABC)         │ │
+│  │  Orchestrator│  │ Entry-Point    │  │  ├─ RealRunner (async)       │ │
+│  │              │  │ Discovery      │  │  └─ MockRunner (tests)       │ │
+│  └──────┬───────┘  └────────────────┘  └──────────────────────────────┘ │
+│         │                                                               │
+│  ┌──────┴───────┐  ┌────────────────┐  ┌──────────────────────────────┐ │
+│  │  StackState  │  │  ComponentInfo │  │  StackDescriptor             │ │
+│  │  FSM (11 st) │  │  Detect Data   │  │  Static Metadata             │ │
+│  │  derive_state│  │               │  │                              │ │
+│  └──────────────┘  └────────────────┘  └──────────────────────────────┘ │
+├──────────────────────────────────────────────────────────────────────────┤
+│                         CORE MODULES (native)                            │
+│                                                                          │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌─────────────────────┐│
+│  │  Chronicle │  │  Guardian  │  │   Vision   │  │ Oracle · Pulse      ││
+│  │  (Activity)│  │ (Exception)│  │(Observabil)│  │ Optimizer (WIP)     ││
+│  └────────────┘  └────────────┘  └────────────┘  └─────────────────────┘│
+├──────────────────────────────────────────────────────────────────────────┤
+│                         ADAPTER LAYER (pluggable)                        │
+│                                                                          │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
+│  │   OpenSpec   │  │   Engram     │  │  Context7    │  │  CodeGraph   │ │
+│  │  (SDD/Specs) │  │  (Memory)    │  │  (Docs AI)   │  │  (Code KG)   │ │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘ │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Layers
+
+### MCP Public API (intentional)
+
+The MCP Public API is the primary interface for AI coding agents. Seven tools are exposed through the [Model Context Protocol](https://modelcontextprotocol.io/) via stdio transport.
+
+| Tool | Purpose | Params |
+|------|---------|--------|
+| `apoch_status` | One-shot system overview | None |
+| `apoch_health` | Active problems and severity | None |
+| `apoch_history` | Activity timeline | `horas`, `tipo` |
+| `apoch_recommend` | Highest-impact next action | None |
+| `apoch_progress` | Productivity trends | `periodo` |
+| `apoch_insights` | Detected patterns | None |
+| `apoch_logs` | Technical debug logs | `nivel`, `limite`, `modulo` |
+
+Each tool is backed by an `ApochCoordinator` method that orchestrates one or more internal modules, aggregates their responses, and builds a standardized `ToolResponse` with confidence scoring, evidence attribution, and error handling.
+
+5 legacy aliases provide backward compatibility for tools previously exposed directly by modules.
+
+See the [MCP Public API Reference](mcp-public-api.md) for complete documentation.
 
 ### Core Stack (frozen)
 
@@ -91,17 +119,19 @@ Six native modules provide persistent intelligence. Three are stable; three are 
 | Language | Python 3.13+ |
 | Package manager | `uv` |
 | CLI framework | `typer` |
-| Architecture | Modular, agent-agnostic |
+| Architecture | Modular, agent-agnostic, three-layer |
+| Public API tools | 7 MCP tools + 5 legacy aliases |
+| Public API version | `"1.0"` (`API_VERSION`) |
 | Methodology | OpenSpec — Spec-Driven Development |
 | Target | OpenCode v1, extensible to other agents |
 | Core Stack | **Frozen** — no architectural changes permitted |
 | Test framework | `pytest` with `asyncio_mode = "auto"` |
 | Test doubles | `MockRunner` + `monkeypatch` |
 | Linting | Ruff (strict) |
-| Stack tests | 401 |
+| Stack tests | 361 |
 | License | MIT |
 | Repository | <https://github.com/guigerdts/Apoch-AI> |
-| Current release | v0.1.0 |
+| Current release | v0.9.0-alpha |
 
 ## Governance Rules
 

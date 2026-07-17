@@ -14,7 +14,7 @@ This project adheres to [Semantic Versioning](https://semver.org/):
 | MINOR | New features, backwards-compatible | `0.1.0` → `0.2.0` |
 | PATCH | Bug fixes, no new features | `0.1.0` → `0.1.1` |
 
-Pre-release versions use an `-alpha` suffix (e.g., `0.7.0-alpha`). During initial development (v0.x.x), MINOR increments can include breaking changes.
+Pre-release versions use an `-alpha` suffix (e.g., `0.9.0-alpha`). During initial development (v0.x.x), MINOR increments can include breaking changes.
 
 ## Sections
 
@@ -44,7 +44,7 @@ Each entry references the PR that introduced it:
 
 ## Current Version
 
-`0.7.0-alpha` — see the CHANGELOG for the full release history.
+`0.9.0-alpha` — see the CHANGELOG for the full release history.
 
 ## Conventions
 

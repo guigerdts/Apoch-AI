@@ -242,7 +242,7 @@ Las tools legacy se eliminan del registro MCP después de:
 | `vision_logs` | `apoch_logs` | Directo | v1.1 | v2.0 |
 | `vision_config` | 🔒 Internal | Sin alias | v1.0 | v1.0 |
 | `chronicle_record` | 🔒 Internal | Sin alias | v1.0 | v1.0 |
-| `chronicle_stats` | ⚡ Advanced | Sin alias | v1.0 | v1.0 |
+| `chronicle_stats` | ⚡ Advanced | Absorbida en history (conteos contextuales). Sin alias. | v1.0 | v1.0 |
 | `guardian_clear_*` | 🔄 Automática | Sin alias | v1.0 | v1.0 |
 | `vision_system` | 🗑️ Eliminar | Sin alias | v1.0 | v1.0 |
 
@@ -487,16 +487,23 @@ class ApochCoordinator:
         """
 
     async def recommend(self) -> RecommendResponse:
-        """Siguiente acción de mayor impacto.
+        """Siguiente acción de mayor impacto sobre la plataforma Apoch-AI.
 
         Entradas:   Ninguna (usa estado actual autónomamente).
-        Salida:     RecommendResponse con Next Action, Why, Priority.
-        Módulos:    Oracle, Optimizer, Pulse, Guardian, Vision.
+        Salida:     RecommendResponse con summary (acción recomendada),
+                    explanation (justificación), priority (HIGH|MEDIUM|LOW),
+                    confidence, suggested_action=None.
+        Módulos:    Oracle (opcional), Optimizer, Pulse, Guardian, Vision.
         Timeouts:   Oracle(2s), Optimizer(1s), Pulse(0.5s),
                     Guardian(0.5s), Vision(0.5s).
-        Fallo:      Degrada gracefulmente: usa módulos disponibles y baja
-                    confidence. No expone qué módulo falló.
-        Evidencia:  1+ source. 0 sources → ERR_TIMEOUT con confidence LOW.
+        Oracle OK:  Consume la recomendación #1 de Oracle (Recommendation).
+        Oracle KO:  Construye recomendación desde Guardian (diagnostics) +
+                    Vision (module_state). Prioridad según severidad.
+        Sin datos:  "No hay recomendaciones en este momento." con confidence HIGH.
+        Fallo total: 0 sources → ERR_TIMEOUT con confidence LOW.
+        Evidencia:   1+ source con etiquetas funcionales (P6). No expone
+                     nombres de módulo internos en texto al usuario.
+        suggested_action: Siempre None.
         """
 
     async def progress(self, periodo: str | None = None) -> ToolResponse:
@@ -514,12 +521,38 @@ class ApochCoordinator:
         """Patrones detectados y oportunidades de mejora.
 
         Entradas:   Ninguna.
-        Salida:     ToolResponse con patrones y oportunidades.
+        Salida:     ToolResponse con patrones detectados (solo type=pattern).
         Módulos:    Optimizer, Pulse.
         Timeouts:   Optimizer(1s), Pulse(0.5s).
         Fallo:      Optimizer timeout → ERR_DEPENDENCY_UNAVAILABLE.
                     Pulse timeout → respuesta solo con Optimizer.
         Evidencia:  Optimizer requerido. Pulse opcional.
+
+        Filtro de hypotheses:
+            Exclusivamente type=pattern.
+            type=opportunity y type=anomaly se reservan para recommend.
+            El filtro es determinístico (OptimizationHypothesis.type),
+            no depende de contenido de texto ni heurísticas.
+
+        Confidence:
+            formula:  round(hypothesis_avg * pulse_factor, 2)
+            - hypothesis_avg: promedio de confidence de las hypotheses
+              que pasaron el filtro. 0.0 si ninguna hypothesis pasó.
+            - pulse_factor: 1.0 (Pulse OK), 0.7 (Pulse timeout),
+              0.5 (Pulse no disponible).
+            - Sin hypotheses que pasen el filtro → confidence 0.0,
+              no error. Respuesta "No se detectaron patrones...".
+
+        Traducción de evidence (P6):
+            Cada detector produce un dict evidence con formato interno
+            distinto (mean, std, count, etc.). El coordinator NUNCA
+            serializa ese dict. Cada hypothesis se traduce a 1-2 frases
+            en lenguaje natural usando:
+            - affected_scope: descripción del alcance (texto humano).
+            - type: pattern/opportunity + domain: cost/time/rework/...
+            - confidence de la hypothesis (sin exponer el número exacto).
+            No se expone: nombres de módulo, OptimizationHypothesis,
+            fields internos, métricas estadísticas, costos, tokens.
         """
 
     async def logs(self, nivel: str | None = None,
@@ -528,13 +561,41 @@ class ApochCoordinator:
         """Logs técnicos del sistema para depuración.
 
         Entradas:   nivel (opcional, INFO|WARN|ERROR|FATAL),
-                    limite (opcional, default 50),
-                    modulo (opcional).
-        Salida:     ToolResponse con entradas de log formateadas.
-        Módulos:    Vision.
+                    limite (opcional, entero positivo, default 50),
+                    modulo (opcional, string).
+        Salida:     ToolResponse. Explanation contiene entradas formateadas
+                    como "[timestamp] LEVEL [module] — mensaje".
+                    evidence con etiquetas funcionales P6.
+                    suggested_action siempre None.
+        Módulos:    Vision (requerido).
         Timeouts:   Vision(0.5s).
         Fallo:      Vision timeout → ERR_DEPENDENCY_UNAVAILABLE.
-        Evidencia:  Vision requerido.
+                    Vision no disponible → ERR_DEPENDENCY_UNAVAILABLE.
+
+        Validación de parámetros:
+            nivel: debe ser INFO, WARN, ERROR o FATAL.
+                   Otro valor → ERR_INVALID_ARGUMENT.
+            limite: debe ser entero positivo > 0.
+                    No entero o ≤ 0 → ERR_INVALID_ARGUMENT.
+            modulo: string libre. Filtro en memoria post-Vision.
+
+        Confidence:
+            1.0 si Vision responde con datos.
+            0.3 si Vision responde con lista vacía.
+            Vision timeout/no disponible → error, no respuesta parcial.
+
+        Filtro por módulo:
+            Vision.recent() no soporta filtro por módulo.
+            El Coordinator aplica modulo en memoria después de obtener
+            resultados. Cuando se usa modulo + limite, el limite se
+            aplica DESPUÉS del filtro por módulo.
+
+        Campos expuestos por entrada (P6):
+            - timestamp (ISO 8601)
+            - level (INFO/WARN/ERROR/FATAL)
+            - message (texto del log)
+            - module (si está presente en LogRecord)
+            NO exponer: context, pid, objetos LogRecord, rutas, config.
         """
 ```
 

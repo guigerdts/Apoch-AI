@@ -256,6 +256,8 @@ Sin esta herramienta, el usuario debe llamar `chronicle_query` con filtros técn
 - **Entradas**: Opcionales: `horas` (últimas N horas), `tipo` (lifecycle, tool, error).
 - **Salida**: Summary, Explanation, Evidence (línea de tiempo narrativa), Suggested Action, Confidence, generated_at, data_freshness.
 - **Prohibido**: IDs de evento, SQL, estructura de tabla, nombres de módulo internos.
+- **Límites**: `horas` default = 24 (si se omite). Máx. 200 eventos, default 50. Sin `tipo` → todos los tipos.
+- **Conteos contextuales**: Incluye conteo por tipo de evento (lifecycle, tool, error) del conjunto actual. Sin tendencias, métricas, analítica ni agregaciones globales.
 - **Casos sin datos**: "No hay actividad registrada en el período solicitado."
 - **Tiempo objetivo**: < 1 segundo.
 
@@ -306,7 +308,7 @@ No debe devolver JSON de eventos crudos. No debe incluir `id`, `event_type`, `so
 - GIVEN Chronicle tiene eventos registrados en las últimas 24 horas
 - WHEN un agente llama `apoch_history`
 - THEN la respuesta MUST ser una lista cronológica descendente en lenguaje natural
-- AND cada entrada MUST ser una frase narrativa (ej: "09:15 — Módulo Vision iniciado")
+- AND cada entrada MUST ser una frase narrativa (ej: "09:15 — Sistema de monitoreo iniciado")
 - AND MUST incluir Confidence (HIGH si los datos son recientes)
 - AND MUST incluir generated_at y data_freshness
 - AND la respuesta MUST NOT incluir IDs de evento, SQL o nombres de tabla
@@ -439,9 +441,11 @@ No debe devolver tracebacks, nombres de módulo internos, códigos de error inte
 ### 1. API Design Review
 
 #### 1.1 Human Intent
-**"¿Cuál es la siguiente acción de mayor impacto que debería realizar ahora?"**
+**"¿Cuál es la siguiente acción de mayor impacto sobre la plataforma Apoch-AI que debería realizar ahora?"**
 
 Esta es la ÚNICA pregunta que responde. No responde estado, salud, historial, métricas, insights ni logs.
+
+**Restricción de dominio**: `apoch_recommend` opera exclusivamente sobre la plataforma Apoch-AI (módulos, configuración, integraciones y funcionamiento del framework). No responde sobre el código, archivos, tests o tareas del proyecto del usuario — esa responsabilidad pertenece al agente OpenCode (PROJECT_MASTER.md §10 Rule 010).
 
 #### 1.2 Why Public?
 Es la herramienta más importante del sistema. Sin ella, el usuario debe interpretar estado, historial, salud y métricas para decidir el próximo paso.
@@ -456,16 +460,19 @@ Es la herramienta más importante del sistema. Sin ella, el usuario debe interpr
 
 #### 1.4 Output Contract
 
-**Contrato ESTRICTO — no se desvía:**
+**Formato**: RecommendResponse (hereda de ToolResponse). Sigue el Principio de Respuesta Unificado (P2).
 
-```
-Next Action:  <acción concreta>
-Why:          <por qué esta acción es la de mayor impacto>
-Priority:     HIGH | MEDIUM | LOW
-Confidence:   <0.00–1.00>
-Generated:    <timestamp ISO 8601>
-Data Fresh:   <segundos>
-```
+| Campo | Origen | Descripción |
+|-------|--------|-------------|
+| `summary` | ToolResponse | **Acción recomendada** — una línea imperativa concreta. Ej: "Reiniciar módulo Guardian" |
+| `explanation` | ToolResponse | **Justificación** — por qué esta acción es la de mayor impacto |
+| `evidence` | ToolResponse | Fuentes que respaldan la recomendación (categorías funcionales, no módulos internos) |
+| `suggested_action` | ToolResponse | **Siempre `None`**. La acción recomendada ya está representada en `summary`. |
+| `confidence` | ToolResponse | 0.00–1.00 |
+| `priority` | RecommendResponse | HIGH \| MEDIUM \| LOW — consumido de Oracle, no calculado por Coordinator |
+| `expected_benefit` | RecommendResponse | Opcional. Una línea describiendo el impacto positivo esperado |
+| `generated_at` | ToolResponse | ISO 8601 |
+| `data_freshness` | ToolResponse | Segundos |
 
 **LÍMITES EXPLÍCITOS — `apoch_recommend` NUNCA responde:**
 
@@ -478,17 +485,41 @@ Data Fresh:   <segundos>
 | Patrones de mejora general | `apoch_insights` |
 | Logs técnicos | `apoch_logs` |
 | Ejecutar cambios | (acción futura, no implementada) |
+| Recomendaciones de codificación | OpenCode (el agente) |
+| Priorización de tareas del proyecto | OpenCode (el agente) |
+| Derivación a otra herramienta pública | Prohibido — ver §No Recommendation Cascade |
 
 - **Entradas**: Ninguna (usa estado actual autónomamente).
-- **Casos sin recomendaciones**: "No hay recomendaciones en este momento. El sistema opera dentro de parámetros normales." (Confidence: HIGH — es una certeza, no una adivinanza)
+- **Oracle disponible**: Coordinator consume la recomendación priorizada #1 de Oracle.
+- **Oracle no disponible**: Coordinator construye recomendación usando Guardian (problemas activos) y Vision (estado de módulos). Sin información suficiente → "No hay recomendaciones en este momento."
+- **Casos sin recomendaciones**: "No hay recomendaciones en este momento. El sistema opera dentro de parámetros normales." (Confidence: HIGH — es una certeza, no una adivinanza). Priority: LOW. suggested_action: None.
 - **Tiempo objetivo**: < 5 segundos.
 - **Si no puede determinar**: Confidence LOW o MEDIUM, con Explanation indicando por qué.
+- **Prioridad**: Coordinator NO calcula prioridad. La consume de Oracle (priority del Recommendation). Si Oracle no está disponible y la recomendación se construye desde Guardian+Vision, la prioridad se asigna según la severidad del problema detectado (CRITICAL/ERROR → HIGH, WARNING → MEDIUM, sin problemas → LOW).
 
 ##### Qué PUEDE incluir (opcional, solo si aporta):
-- Expected benefit: una línea describiendo el impacto positivo
+- Expected benefit: una línea describiendo el impacto positivo esperado
 
 ##### Qué NUNCA incluye:
-- Estado de módulos, diagnósticos, eventos, métricas, patrones, logs, módulos consultados, orden de ejecución
+- Estado de módulos, diagnósticos, eventos, métricas, patrones, logs, módulos consultados, orden de ejecución, derivación a otra tool pública, recomendaciones de codificación, priorización de tareas del proyecto del usuario.
+
+##### Calidad de la recomendación
+Toda recomendación debe cumplir simultáneamente estos 7 criterios:
+1. **Única** — exactamente una acción, no una lista.
+2. **Priorizada** — HIGH/MEDIUM/LOW según impacto.
+3. **Accionable** — el usuario/agente puede ejecutarla inmediatamente.
+4. **Específica** — no genérica. "Reiniciar módulo Guardian" ≠ "Revisar sistema".
+5. **Verificable** — se puede confirmar si se ejecutó o no.
+6. **Ejecutable inmediatamente** — no requiere acciones previas.
+7. **Pertenece al dominio Apoch-AI** — módulos, configuración, integraciones. Nunca código del usuario.
+
+##### No Recommendation Cascade
+`apoch_recommend` NUNCA responde indicando al usuario que ejecute otra herramienta pública. Ejemplos prohibidos:
+- ❌ "Ejecute apoch_health"
+- ❌ "Consulte apoch_logs"  
+- ❌ "Revise apoch_history"
+
+La herramienta debe entregar directamente la mejor recomendación disponible. Si necesita datos de otra herramienta para formular la recomendación, los consulta INTERNAMENTE (vía módulos) y los sintetiza en la respuesta. Nunca deriva al usuario a otra llamada.
 
 #### 1.5 UX Validation
 - **Usuario nuevo**: "Recommend = me dice qué hacer. Ideal si no sé por dónde seguir."
@@ -499,7 +530,12 @@ Data Fresh:   <segundos>
 `recommend` admite expansión controlada: nuevas fuentes de recomendación sin cambiar el contrato de salida.
 
 #### 1.7 Internal Mapping (solo mantenimiento)
-- Oracle, Optimizer, Pulse, Guardian, Vision
+- **Oracle** (recomendación priorizada vía `oracle.recommendations` → `list[Recommendation]`) — **opcional**. Si está disponible, se usa su recomendación #1.
+- **Optimizer** (hypotheses, vía Oracle), **Pulse** (measurements, vía Oracle).
+- **Guardian** (diagnostics) — usado directamente si Oracle no está disponible.
+- **Vision** (module_state) — usado directamente si Oracle no está disponible.
+- Nota: recommend NO consulta `oracle.status()` (lo usa status). Consulta `oracle.recommendations()`.
+- **Evidence público**: Las fuentes en `evidence[]` usan etiquetas funcionales ("Diagnóstico del sistema", "Estado de componentes"), no nombres de módulo internos. Esto cumple P6 (no exponer implementación). El campo `source` sigue el mismo criterio que status: identificador técnico interno no visible en texto al usuario.
 
 #### 1.8 Acceptance Matrix
 - [x] Responde intención humana (una específica, no varias)
@@ -513,7 +549,7 @@ Data Fresh:   <segundos>
 - [x] Rule of 30 Seconds
 
 #### 1.9 Anti-Patterns
-No debe responder estado, salud, historial, métricas, insights, logs. No debe ejecutar cambios. No debe enumerar módulos. No debe exponer el orden de ejecución de módulos internos. No debe derivar a otra tool.
+No debe responder estado, salud, historial, métricas, insights, logs. No debe ejecutar cambios. No debe enumerar módulos. No debe exponer el orden de ejecución de módulos internos. No debe derivar a otra tool pública (No Recommendation Cascade). No debe recomendar acciones de codificación o tareas del proyecto del usuario (dominio exclusivo Apoch-AI).
 
 #### 1.10 Definition of Done
 - [x] Specification
@@ -530,40 +566,50 @@ No debe responder estado, salud, historial, métricas, insights, logs. No debe e
 
 #### Requirement: Recomendación de Siguiente Acción
 
-`apoch_recommend` MUST devolver la siguiente acción de mayor impacto basada en el estado actual del sistema. La respuesta MUST limitarse a: Next Action, Why, Priority, Confidence, Generated, Data Fresh.
+`apoch_recommend` MUST devolver la siguiente acción de mayor impacto basada en el estado actual del sistema. La respuesta MUST usar el formato RecommendResponse (hereda de ToolResponse): summary (acción), explanation (justificación), priority, confidence, generated_at, data_freshness.
 
 ##### Scenario: Happy path — recomendación disponible
 
 - GIVEN Oracle tiene una recomendación activa priorizada
 - WHEN un agente llama `apoch_recommend`
-- THEN la respuesta MUST incluir "Next Action" con una acción concreta
-- AND MUST incluir "Why" explicando por qué es la de mayor impacto
-- AND MUST incluir "Priority" (HIGH/MEDIUM/LOW)
-- AND MUST incluir "Confidence" como número entre 0.00 y 1.00
-- AND MUST incluir "Generated" y "Data Fresh"
-- AND la respuesta MUST NOT incluir estado, salud, historial ni módulos
+- THEN la respuesta MUST incluir `summary` con una acción concreta (ej: "Reiniciar módulo Guardian")
+- AND `explanation` MUST explicar por qué es la de mayor impacto
+- AND `priority` MUST ser HIGH/MEDIUM/LOW
+- AND `confidence` MUST ser un número entre 0.00 y 1.00
+- AND `suggested_action` MUST ser `None`
+- AND MUST incluir `generated_at` y `data_freshness`
+- AND la respuesta MUST NOT incluir estado, salud, historial, módulos ni derivación a otra tool
 
 ##### Scenario: Sin recomendaciones
 
 - GIVEN todos los módulos reportan operación normal sin oportunidades detectadas
 - WHEN un agente llama `apoch_recommend`
-- THEN la respuesta MUST indicar "No hay recomendaciones en este momento. El sistema opera dentro de parámetros normales."
+- THEN `summary` MUST indicar "No hay recomendaciones en este momento. El sistema opera dentro de parámetros normales."
 - AND Confidence MUST ser HIGH (es una certeza)
+- AND `suggested_action` MUST ser `None`
 
 ##### Scenario: Datos insuficientes
 
 - GIVEN el sistema acaba de iniciar y no hay datos históricos
 - WHEN un agente llama `apoch_recommend`
-- THEN la respuesta MUST tener Confidence LOW o MEDIUM
-- AND MUST incluir Explanation indicando por qué la confianza es limitada
+- THEN `confidence` MUST ser LOW o MEDIUM
+- AND `explanation` MUST indicar por qué la confianza es limitada
 
-##### Scenario: Oracle no disponible
+##### Scenario: Oracle no disponible con datos de Guardian+Vision
 
-- GIVEN Oracle no está disponible pero otros módulos sí
+- GIVEN Oracle no está disponible pero Guardian y Vision sí
 - WHEN un agente llama `apoch_recommend`
-- THEN la respuesta MUST degradar gracefulmente usando módulos disponibles
-- AND Confidence MUST reflejar la degradación (MEDIUM o LOW)
+- THEN la respuesta MUST construir una recomendación desde Guardian (problemas activos) y Vision (estado de módulos)
+- AND `priority` MUST asignarse según severidad: CRITICAL/ERROR → HIGH, WARNING → MEDIUM, sin problemas → LOW
+- AND `confidence` MUST reflejar la degradación (MEDIUM o LOW)
 - AND MUST NOT exponer qué módulo falló
+- AND `suggested_action` MUST ser `None`
+
+##### Scenario: Sin datos de ningún módulo
+
+- GIVEN ningún módulo responde (todos timeout o no disponibles)
+- WHEN un agente llama `apoch_recommend`
+- THEN la respuesta MUST devolver `ERR_TIMEOUT`
 
 ---
 
@@ -689,9 +735,15 @@ Sin esta herramienta, las hipótesis de Optimizer quedan inaccesibles. Sin embar
 
 #### 1.4 Output Contract
 - **Entradas**: Ninguna.
-- **Salida**: Summary, Explanation, Evidence (patrones, oportunidades, sugerencias), Suggested Action, Confidence, generated_at, data_freshness.
+- **Salida**: Summary, Explanation, Evidence (patrones detectados), Suggested Action=None, Confidence, generated_at, data_freshness.
 - **No ejecuta cambios. No modifica estado.**
 - **Casos sin datos**: "No se detectaron patrones ni oportunidades de mejora."
+- **Confidence**: Se calcula como `hypothesis_confidence * pulse_factor`, donde:
+  - `hypothesis_confidence` = el promedio de `OptimizationHypothesis.confidence` de todas las hypotheses expuestas, o 0.0 si no hay hypotheses que pasen el filtro.
+  - `pulse_factor` = 1.0 si Pulse respondió correctamente, 0.7 si Pulse timeout, 0.5 si Pulse no está disponible (no inyectado).
+  - El resultado se redondea a 2 decimales y se convierte a label según las reglas estándar de confidence del Coordinator.
+- **Evidence**: Cada `OptimizationHypothesis` se traduce a una o más frases en lenguaje natural dentro del campo Explanation. No se serializa el campo `evidence` (dict) de la hypothesis. No se exponen métricas estadísticas internas (mean, std, min, max, count, cost, tokens). No se expone el tipo interno `OptimizationHypothesis` ni sus atributos crudos.
+- **Filtro de hypotheses**: `apoch_insights` expone únicamente hypotheses con `type=pattern`. Las hypotheses con `type=opportunity` y `type=anomaly` se reservan para `apoch_recommend` (vía Oracle). El filtro es determinístico: se basa exclusivamente en el campo `type` de la hypothesis, no en interpretación de texto. El coordinator aplica este filtro antes de construir la respuesta.
 - **Tiempo objetivo**: < 3 segundos.
 
 #### 1.5 UX Validation
@@ -719,7 +771,18 @@ El nombre `insights` es lo suficientemente genérico para no romper clientes si 
 - [x] Rule of 30 Seconds (parcial — "insights" puede no ser obvio)
 
 #### 1.9 Anti-Patterns
-No debe ejecutar cambios. No debe modificar estado. No debe devolver confianza estadística cruda. No debe superponerse con `apoch_recommend` (si la recomendación es accionable ahora, pertenece a recommend).
+No debe ejecutar cambios. No debe modificar estado.
+
+No debe devolver confianza estadística cruda ni evidence dictionaries internos de `OptimizationHypothesis`. Nunca serializar el campo `evidence` (dict) — cada detector tiene un formato interno distinto que no debe exponerse.
+
+No debe superponerse con `apoch_recommend`. Regla de filtro obligatoria:
+- `apoch_insights` expone exclusivamente hypotheses con `type=pattern`.
+- Las hypotheses con `type=opportunity` y `type=anomaly` se reservan para `apoch_recommend` (vía Oracle).
+- El filtro es determinístico: se basa exclusivamente en `OptimizationHypothesis.type`, no en contenido de texto ni en heurísticas de accionabilidad.
+- `apoch_recommend` NO debe recibir hypotheses con `type=pattern` desde Oracle. Si Oracle las recibe, debe filtrarlas también.
+- Ambas tools operan sobre conjuntos disjuntos de hypotheses. Nunca comparten la misma hypothesis.
+
+No debe exponer nombres de módulo internos (Optimizer, Pulse) en el texto visible. La evidencia pública debe usar etiquetas funcionales (P6).
 
 #### 1.10 Definition of Done
 - [x] Specification
@@ -738,33 +801,65 @@ No debe ejecutar cambios. No debe modificar estado. No debe devolver confianza e
 
 `apoch_insights` MUST devolver oportunidades de mejora basadas en hipótesis de Optimizer y datos de Pulse, sin ejecutar cambios ni modificar estado.
 
-##### Scenario: Happy path — oportunidades detectadas
+El criterio de selección de hypotheses sigue estas reglas:
+1. Consultar Optimizer via `optimizer.hypotheses` (servicio cross-module).
+2. Filtrar hypotheses: solo se exponen las que tienen `type=pattern`. Las de `type=opportunity` y `type=anomaly` quedan excluidas (pertenecen a `apoch_recommend` vía Oracle).
+3. Si Pulse está disponible, se pueden usar sus datos para enriquecer la narración (no para crear hypotheses nuevas).
+4. Traducir cada hypothesis a lenguaje natural sin exponer `evidence` interno.
 
-- GIVEN Optimizer tiene hipótesis activas con `confidence > 0.5`
+##### Scenario: Happy path — ambos módulos OK
+
+- GIVEN Optimizer tiene hypotheses con `type=pattern` y `confidence > 0.5`
+- AND Pulse responde con datos de la sesión
 - WHEN un agente llama `apoch_insights`
-- THEN la respuesta MUST incluir oportunidades de mejora en Evidence
-- AND MUST incluir patrones detectados (si existen)
+- THEN la respuesta MUST incluir los patrones detectados en Evidence
+- AND MUST incluir resumen interpretado en Summary
+- AND confidence MUST reflejar la presencia de ambos módulos
 
-##### Scenario: Sin oportunidades
+##### Scenario: Optimizer OK + Pulse timeout
 
-- GIVEN Optimizer no tiene hipótesis activas
+- GIVEN Optimizer tiene hypotheses con `type=pattern` que pasan el filtro
+- AND Pulse no responde (timeout)
+- WHEN un agente llama `apoch_insights`
+- THEN la respuesta MUST incluir patrones igualmente
+- AND confidence MUST aplicar el factor Pulse (0.7)
+- AND NO debe indicar error — la respuesta es válida sin Pulse
+
+##### Scenario: Sin patrones ni oportunidades
+
+- GIVEN Optimizer no tiene hypotheses con `type=pattern` que pasen el filtro
 - WHEN un agente llama `apoch_insights`
 - THEN la respuesta MUST indicar "No se detectaron patrones ni oportunidades de mejora"
+- AND confidence MUST ser 0.0 (ninguna hypothesis pasó el filtro)
+
+Consideraciones:
+- No importa si Optimizer tiene hypotheses con `type=opportunity` o `type=anomaly` — el filtro las excluye.
+- No importa si Optimizer tiene datos pero `confidence < 0.5` — la ausencia de hypotheses que pasen ambos filtros (type + confidence) produce esta respuesta.
+
+##### Scenario: Solo oportunidades o anomalías (sin patrones)
+
+- GIVEN Optimizer tiene hypotheses pero ninguna con `type=pattern` (solo `type=opportunity` y/o `type=anomaly`)
+- WHEN un agente llama `apoch_insights`
+- THEN la respuesta MUST indicar "No se detectaron patrones ni oportunidades de mejora"
+- AND confidence MUST ser 0.0
+- Esto es correcto porque insights solo expone `type=pattern`. Las opportunities/anomalies pertenecen a recommend.
+- AND NO debe sugerir al usuario usar recommend u otra tool.
 
 ##### Scenario: Optimizer no disponible
 
-- GIVEN Optimizer no está cargado
+- GIVEN Optimizer no está cargado (services.optimizer is None) o timeout
 - WHEN un agente llama `apoch_insights`
 - THEN la respuesta MUST usar `ERR_DEPENDENCY_UNAVAILABLE`
 
-##### Scenario: Recomendación vs insight
+##### Scenario: Recomendación vs insight — no superposición
 
-- GIVEN existe una hipótesis sobre lentitud en el editor
+- GIVEN Optimizer tiene hypotheses de tipo `pattern` ("Aumento del 18% en tiempo de respuesta en sesiones largas") y `opportunity` ("reducir pestañas abiertas")
 - WHEN un agente pregunta "¿qué debería hacer ahora?" (recommend)
-- Y otro agente pregunta "¿qué patrones ves?" (insights)
-- THEN recommend MUST devolver una acción concreta ("Cerrar pestañas no utilizadas")
-- AND insights MUST devolver el patrón detectado ("Aumento del 18% en tiempo de respuesta en sesiones largas")
+- AND otro agente pregunta "¿qué patrones ves?" (insights)
+- THEN recommend MUST acceder a la `opportunity` (vía Oracle) y devolver una acción concreta ("Cerrar pestañas no utilizadas")
+- AND insights MUST acceder al `pattern` y devolver el patrón detectado ("Aumento del 18% en tiempo de respuesta en sesiones largas")
 - AND ambas respuestas NO DEBEN superponerse ni contradecirse
+- AND ninguna de las dos herramientas debe recibir la misma hypothesis de Optimizer — el filtro por `type` garantiza conjuntos disjuntos
 
 ---
 
@@ -788,8 +883,13 @@ Desarrolladores que mantienen Apoch-AI necesitan acceso a logs estructurados. Es
 | `apoch_trace` | ❌ Descartado | Más específico (trazas). Logs cubre más. |
 
 #### 1.4 Output Contract
-- **Entradas**: `nivel` (INFO, WARN, ERROR, FATAL), `limite`, `modulo` — todos opcionales.
-- **Salida**: Entradas de log formateadas con timestamp, nivel, mensaje, Confidence, generated_at, data_freshness.
+- **Entradas**: `nivel` (INFO, WARN, ERROR, FATAL), `limite` (entero positivo), `modulo` (string) — todos opcionales.
+- **Salida**: ToolResponse estándar. El campo Explanation contiene las entradas de log formateadas (una por línea). Evidence lista las fuentes con etiquetas funcionales P6. Suggested Action siempre None.
+- **Confidence**: 1.0 si Vision responde con datos. 0.3 si Vision responde con lista vacía. Vision no disponible o timeout → `ERR_DEPENDENCY_UNAVAILABLE` (no respuesta parcial).
+- **Campos expuestos por entrada de log**: Solo `timestamp` (ISO 8601), `level`, `message` y (si está presente) `module`. Formato: `[timestamp] LEVEL [module] — mensaje`.
+- **Campos NO expuestos** (excluir explícitamente): `context` (dict arbitrario), `pid` (process ID), objetos `LogRecord` serializados, o cualquier estructura interna de Vision.
+- **Filtro por módulo**: Vision.recent() no soporta filtro por módulo. El Coordinator aplica el filtro `modulo` en memoria después de obtener los resultados de Vision. Cuando se usa `modulo` junto con `limite`, el límite se aplica después del filtro — si hay N registros en Vision pero solo M coinciden con el módulo, se devuelven hasta `limite` de esos M. No se garantiza que se hayan examinado todos los registros de Vision (solo hasta el límite interno de Vision).
+- **Validación de parámetros**: Si `nivel` no es uno de `INFO`, `WARN`, `ERROR`, `FATAL`, la respuesta es `ERR_INVALID_ARGUMENT`. Si `limite` no es un entero positivo, la respuesta es `ERR_INVALID_ARGUMENT`.
 - **Casos sin datos**: "No hay entradas de log que coincidan con los filtros especificados."
 - **Tiempo objetivo**: < 1 segundo.
 
@@ -816,7 +916,13 @@ Desarrolladores que mantienen Apoch-AI necesitan acceso a logs estructurados. Es
 - [x] Rule of 30 Seconds (perfil desarrollador)
 
 #### 1.9 Anti-Patterns
-No debe ser la herramienta principal para usuarios normales. No debe exponer formato interno de almacenamiento. No debe derivar a otra tool.
+No debe ser la herramienta principal para usuarios normales. No debe exponer formato interno de almacenamiento (estructuras de Vision, rutas de archivos, configuración). No debe derivar a otra tool.
+
+No debe exponer el campo `context` de LogRecord — contiene datos arbitrarios que pueden incluir información interna sensible (paths, config, métricas). No debe exponer `pid` del proceso.
+
+No debe serializar objetos LogRecord completos. Cada entrada debe formatearse como texto legible con solo timestamp, level, message y module.
+
+No debe superponerse con `apoch_history`: history presenta eventos como narrativa cronológica para cualquier usuario. logs presenta entradas técnicas sin interpretación, solo para desarrolladores.
 
 #### 1.10 Definition of Done
 - [x] Specification
@@ -859,6 +965,40 @@ No debe ser la herramienta principal para usuarios normales. No debe exponer for
 - GIVEN hay entradas de log recientes
 - WHEN un agente llama `apoch_logs` sin parámetros
 - THEN la respuesta MUST devolver las últimas 50 entradas por defecto
+
+##### Scenario: Filtro por módulo
+
+- GIVEN hay entradas de log de varios módulos (optimizer, pulse, vision)
+- WHEN un agente llama `apoch_logs` con `modulo=optimizer`
+- THEN la respuesta MUST contener solo entradas cuyo módulo coincida con "optimizer"
+- AND el filtro se aplica en memoria (post Vision)
+
+##### Scenario: Módulo + límite simultáneos
+
+- GIVEN hay 100 entradas de log, 10 del módulo "optimizer"
+- WHEN un agente llama `apoch_logs` con `modulo=optimizer` y `limite=5`
+- THEN la respuesta MUST contener máximo 5 entradas
+- AND todas deben ser del módulo "optimizer"
+- AND el límite se aplica DESPUÉS del filtro por módulo
+
+##### Scenario: Vision timeout
+
+- GIVEN Vision no responde dentro del timeout (0.5s)
+- WHEN un agente llama `apoch_logs`
+- THEN la respuesta MUST usar `ERR_DEPENDENCY_UNAVAILABLE`
+
+##### Scenario: Vision no disponible
+
+- GIVEN Vision no está cargado (services.vision is None)
+- WHEN un agente llama `apoch_logs`
+- THEN la respuesta MUST usar `ERR_DEPENDENCY_UNAVAILABLE`
+
+##### Scenario: Parámetros inválidos
+
+- GIVEN un agente llama `apoch_logs` con `nivel=DEBUG`
+- WHEN el nivel no está en la lista permitida (INFO, WARN, ERROR, FATAL)
+- THEN la respuesta MUST usar `ERR_INVALID_ARGUMENT`
+- AND lo mismo aplica para `limite` no positivo
 
 ---
 
@@ -933,6 +1073,6 @@ Consistencia: prefijo `apoch_` + nombre UNIX-compatible. Buenos nombres cortos (
 | `vision_logs` | `apoch_logs` | Backward compat alias |
 | `vision_config` | 🔒 Internal | Eliminar de MCP público |
 | `chronicle_record` | 🔒 Internal | Eliminar de MCP público |
-| `chronicle_stats` | ⚡ Advanced | Mantener como Advanced o fusionar en history |
+| `chronicle_stats` | ⚡ Advanced | Absorbida en history (conteos contextuales por tipo en el resumen). Sin tool independiente. |
 | `guardian_clear_*` | 🔄 Automática | Mover a interno |
 | `vision_system` | 🗑️ Eliminar | Contenido redundante |

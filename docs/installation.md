@@ -1,6 +1,6 @@
 # Installation Guide
 
-**Apoch-AI** v0.7.0-alpha — Python 3.13+, managed with [uv](https://docs.astral.sh/uv/).
+**Apoch-AI** v0.9.0-alpha — Python 3.13+, managed with [uv](https://docs.astral.sh/uv/).
 
 ---
 
@@ -86,7 +86,7 @@ pip install apoch-ai        # ⛔ won't work until published
 
 ```bash
 uv run apoch --version
-# → 0.7.0-alpha
+# → 0.9.0-alpha
 ```
 
 Or if installed globally:

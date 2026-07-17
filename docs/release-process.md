@@ -10,7 +10,7 @@ Apoch-AI follows [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PATCH).
 | MINOR | New features in a backwards-compatible manner |
 | PATCH | Bug fixes and small corrections |
 
-Pre-release labels use `-alpha` suffix (e.g., `0.7.0-alpha`).
+Pre-release labels use `-alpha` suffix (e.g., `0.9.0-alpha`).
 
 ## Release Checklist
 
@@ -26,15 +26,15 @@ Pre-release labels use `-alpha` suffix (e.g., `0.7.0-alpha`).
 
 ```bash
 # Tagging a release
-git tag v0.7.0-alpha
-git push origin v0.7.0-alpha
+git tag v0.9.0-alpha
+git push origin v0.9.0-alpha
 ```
 
 ## Current Release
 
 | Attribute | Value |
 |-----------|-------|
-| Version | `0.7.0-alpha` |
+| Version | `0.9.0-alpha` |
 | Status | Alpha — active development |
 | CHANGELOG | `/root/Apoch-AI/CHANGELOG.md` |
 | Milestone | #1 — Ecosystem Adapters (all 4 adapters implemented, Core Stack stable) |

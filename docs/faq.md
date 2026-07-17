@@ -185,3 +185,84 @@ Large changes use **chained PRs** (stacked-to-main):
 - PR8.2: Core Lifecycle (full implementation)
 
 Each PR is independently reviewable, under 400 changed lines, and merges to main.
+
+---
+
+## MCP Public API
+
+### What MCP tools does Apoch-AI expose?
+
+Seven public tools:
+
+| Tool | What it tells you |
+|------|-------------------|
+| `apoch_status` | Is the system healthy? What components are active? Any recent activity? |
+| `apoch_health` | Are there active problems? How severe? What should I do? |
+| `apoch_history` | What happened recently? Tool calls, errors, lifecycle events? |
+| `apoch_recommend` | What should I do next to improve the project? |
+| `apoch_progress` | How much work happened today/this week/this month? |
+| `apoch_insights` | Are there patterns or anomalies in my development workflow? |
+| `apoch_logs` | What do the raw debug logs say? Any errors or warnings? |
+
+Plus 5 legacy aliases for backward compatibility (see [migration guide](mcp-public-api.md#migration-guide)).
+
+### How do I call these tools from an AI agent?
+
+The tools are served over MCP stdio transport. When you run `uv run apoch mcp serve`, the gateway registers all tools. An agent like OpenCode can then discover and invoke them through its MCP client.
+
+### Is there a REST API?
+
+No. The API uses the Model Context Protocol over stdio transport. This is the standard protocol for AI coding agents.
+
+### What does a tool response look like?
+
+Every successful response has these fields:
+
+```json
+{
+  "api_version": "1.0",
+  "summary": "🟢 Todos los sistemas operativos",
+  "explanation": "Todos los módulos respondieron correctamente.",
+  "evidence": [
+    {"source": "Vision", "confidence": 0.8,
+     "collected_ago": 0, "based_on": "module response"}
+  ],
+  "suggested_action": null,
+  "confidence": 1.0,
+  "generated_at": "2026-07-17T12:00:00+00:00",
+  "data_freshness": 0,
+  "metadata": {}
+}
+```
+
+Error responses use a different format: `{"ok": false, "error": {"code": "ERR_...", "message": "..."}}`.
+
+### How is confidence calculated?
+
+Each tool computes confidence differently:
+
+| Tool | With full data | With partial data | Without data |
+|------|---------------|-------------------|-------------|
+| `apoch_status` | 1.0 | 0.67 | ERR_TIMEOUT |
+| `apoch_health` | 1.0 | 0.5 | ERR_DEPENDENCY_UNAVAILABLE |
+| `apoch_history` | 0.50 | — | 0.30 |
+| `apoch_recommend` | 0.85 | 1.0 (fallback) | ERR_TIMEOUT |
+| `apoch_progress` | ≥0.7 | — | 0.3 |
+| `apoch_insights` | computed | 0.56–0.42 | 0.0 |
+| `apoch_logs` | 1.0 | — | 0.3 |
+
+### What error codes can tools return?
+
+| Code | Meaning |
+|------|---------|
+| `ERR_TIMEOUT` | Module didn't respond in time |
+| `ERR_DEPENDENCY_UNAVAILABLE` | Required module not loaded/failed |
+| `ERR_INVALID_ARGUMENT` | Bad parameter value |
+| `ERR_INTERNAL` | Unexpected internal error |
+| `ERR_NOT_IMPLEMENTED` | Tool not implemented yet |
+
+See the [Error Catalog](mcp-public-api.md#error-catalog) for complete details.
+
+### How do I migrate from old tools (vision_state, chronicle_query, etc.)?
+
+See the [Migration Guide](mcp-public-api.md#migration-guide) for before/after examples.

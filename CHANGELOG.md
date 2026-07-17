@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.9.0-alpha] — 2026-07-17
+
+### Added
+
+- **MCP Public API — 7 Intentional Tools** (`public_api/coordinator.py`): Complete redesign from module-exposed tools to a coordinated public API layer:
+  - `apoch_status` — system overview aggregated from Vision, Guardian, Chronicle, Oracle
+  - `apoch_health` — diagnostics from Guardian with optional Vision enrichment
+  - `apoch_history` — activity timeline from Chronicle with horas/tipo filters
+  - `apoch_recommend` — recommendation engine with Oracle + Guardian fallback
+  - `apoch_progress` — productivity trends from Pulse with periodo enum
+  - `apoch_insights` — pattern detection from Optimizer with Pulse degradation
+  - `apoch_logs` — debug log entries from Vision with nivel/limite/modulo filters
+- **ToolResponse Contract** (`public_api/models.py`): Standardized response format with `EvidenceSource`, `RecommendResponse` (with priority), and `ErrorResponse` across all tools
+- **Error Catalog** (`public_api/errors.py`): 9 standard error codes with `error_response()` builder
+- **Progressive Registration**: Each PR registers exactly its tool — no stubs, no fakes (PR2→PR8)
+- **Legacy Aliases** (PR9): 5 backward-compatible wrappers (`vision_state→apoch_status`, `chronicle_query→apoch_history`, `guardian_diagnostics→apoch_health`, `guardian_all_diagnostics→apoch_health`, `vision_logs→apoch_logs`) with deprecation metadata
+- **Documentation PR10**: Comprehensive MCP Public API reference (docs/mcp-public-api.md, 1,374 lines), benchmarks (docs/benchmarks.md), updated README, architecture, quickstart, and FAQ
+
+### Changed
+
+- `pyproject.toml` version bumped from `0.7.0-alpha` to `0.9.0-alpha`
+- Module-level `get_tool_defs()` removed from Vision, Chronicle, Guardian — tools now register centrally via the coordinator
+- All 11 registered tools (7 public + 5 legacy aliases minus 1 duplicate) managed by `AgentAdapterManager` in progressive order: coordinator → legacy → modules
+
+### Fixed
+
+- `progress()` method had orphaned continuation code from legacy alias insertion — happy-path body was split from its method. Restored and fixed `confidence` reference in no-data return path.
+
+### Documentation
+
+- New [MCP Public API Reference](docs/mcp-public-api.md) — complete tool docs with parameters, examples, error codes, migration guide
+- New [Benchmarks](docs/benchmarks.md) — 1,471 tests, 92.1% coverage, per-area timing
+- Updated [README.md](README.md) — 7 MCP tools table, 3-layer architecture diagram, 1,463 test count
+- Updated [Architecture Overview](docs/architecture.md) — Public API layer added
+- Updated [Quick Start](docs/quickstart.md) — MCP gateway usage section
+- Updated [FAQ](docs/faq.md) — MCP tool questions added
+
+---
+
 ## [0.8.0-alpha] — 2026-07-16
 
 ### Fixed (Critical Blockers)

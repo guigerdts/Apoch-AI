@@ -46,5 +46,10 @@ openspec/changes/archive/
 
 # Apoch-AI backups
 .apoch-backups/
+
+# Internal working documents (not part of public release)
+.internal/
+
+# Audit artifacts
 docs/audit-report.md
 PR13_EVIDENCE.md

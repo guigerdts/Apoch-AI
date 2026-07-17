@@ -127,15 +127,17 @@ class TestDiagnosticsAPI:
         """Unknown modules return None."""
         assert guardian.diagnostics("GhostModule") is None
 
-    def test_all_diagnostics_empty_initially(self, guardian: GuardianModule):
+    @pytest.mark.asyncio
+    async def test_all_diagnostics_empty_initially(self, guardian: GuardianModule):
         """all_diagnostics() returns empty dict on fresh Guardian."""
-        assert guardian.all_diagnostics() == {}
+        assert await guardian.all_diagnostics() == {}
 
-    def test_all_diagnostics_returns_copy(self, guardian: GuardianModule):
+    @pytest.mark.asyncio
+    async def test_all_diagnostics_returns_copy(self, guardian: GuardianModule):
         """Returned dict is a copy — mutating it doesn't affect Guardian."""
-        result = guardian.all_diagnostics()
+        result = await guardian.all_diagnostics()
         result["injected"] = None
-        assert guardian.all_diagnostics() == {}
+        assert await guardian.all_diagnostics() == {}
 
     def test_clear_diagnostics_removes_entry(self, guardian: GuardianModule, broken: _BrokenModule, context: Context):
         """After a failure, clear_diagnostics removes the entry."""
@@ -147,7 +149,8 @@ class TestDiagnosticsAPI:
         guardian.clear_diagnostics("_BrokenModule")
         assert guardian.diagnostics("_BrokenModule") is None
 
-    def test_clear_all_diagnostics_clears_all(self, guardian: GuardianModule):
+    @pytest.mark.asyncio
+    async def test_clear_all_diagnostics_clears_all(self, guardian: GuardianModule):
         """clear_all_diagnostics() empties the store."""
         # Manually inject a diagnostic to simulate known state
         guardian._diagnostics["M1"] = ModuleDiagnostics(
@@ -156,7 +159,7 @@ class TestDiagnosticsAPI:
             fail_count=1, last_failure_time="now",
         )
         guardian.clear_all_diagnostics()
-        assert guardian.all_diagnostics() == {}
+        assert await guardian.all_diagnostics() == {}
 
     def test_clear_nonexistent_is_noop(self, guardian: GuardianModule):
         """Clearing an unknown module does not raise."""
@@ -334,58 +337,9 @@ class TestStopClearsDiagnostics:
         # Guardian must be RUNNING before we can stop()
         await guardian.start(context)
         await guardian.protect(broken.start(context), broken)
-        assert len(guardian.all_diagnostics()) == 1
+        assert len(await guardian.all_diagnostics()) == 1
         await guardian.stop()
-        assert guardian.all_diagnostics() == {}
+        assert await guardian.all_diagnostics() == {}
 
 
-class TestGuardianGetToolDefs:
-    """GuardianModule.get_tool_defs() returns correct MCP tool definitions."""
 
-    def test_returns_list_of_tool_defs(self) -> None:
-        """get_tool_defs returns a list with 4 entries."""
-        from apoch.modules.guardian.module import GuardianModule
-
-        mod = GuardianModule({})
-        defs = mod.get_tool_defs()
-        assert len(defs) == 4
-
-    def test_each_tool_def_has_required_attributes(self) -> None:
-        """Each ToolDef has name, description, input_schema, handler_name."""
-        from apoch.adapters.base import ToolDef
-        from apoch.modules.guardian.module import GuardianModule
-
-        mod = GuardianModule({})
-        for tool in mod.get_tool_defs():
-            assert isinstance(tool, ToolDef)
-            assert tool.name
-            assert tool.description
-            assert isinstance(tool.input_schema, dict)
-            assert tool.handler_name
-
-    def test_handler_names_exist_as_public_methods(self) -> None:
-        """Every handler_name corresponds to a public callable method on the module."""
-        from apoch.modules.guardian.module import GuardianModule
-
-        mod = GuardianModule({})
-        for tool in mod.get_tool_defs():
-            handler = getattr(mod, tool.handler_name, None)
-            assert handler is not None, (
-                f"Handler '{tool.handler_name}' not found on GuardianModule"
-            )
-            assert callable(handler), (
-                f"Handler '{tool.handler_name}' is not callable"
-            )
-            assert not tool.handler_name.startswith("_")
-
-    def test_input_schemas_are_valid_json_schema(self) -> None:
-        """Each input_schema has a valid type and properties structure."""
-        from apoch.modules.guardian.module import GuardianModule
-
-        mod = GuardianModule({})
-        for tool in mod.get_tool_defs():
-            schema = tool.input_schema
-            assert "type" in schema
-            assert schema["type"] == "object"
-            assert "properties" in schema
-            assert isinstance(schema["properties"], dict)

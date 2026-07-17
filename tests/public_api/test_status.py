@@ -21,6 +21,7 @@ import asyncio
 
 import pytest
 
+from apoch.modules.guardian.diagnostics import ModuleDiagnostics
 from apoch.public_api.coordinator import (
     STATUS_RECENT_EVENTS_LIMIT,
     STATUS_RECENT_WINDOW_MINUTES,
@@ -51,21 +52,41 @@ class _SlowVision:
 
 
 class _FakeGuardian:
-    """Fake Guardian module that returns fixed diagnostics."""
+    """Fake Guardian module that returns fixed diagnostics.
+
+    Accepts test-friendly ``list[dict]`` and converts internally to
+    real ``ModuleDiagnostics`` format.
+    """
 
     def __init__(self, diagnostics: list[dict] | None = None) -> None:
-        self._diagnostics = diagnostics or []
+        raw = diagnostics or []
+        self._diagnostics: dict[str, ModuleDiagnostics] = {}
+        for d in raw:
+            mod = d.get("module", "unknown")
+            sev = d.get("severity", "WARNING")
+            msg = d.get("message", "")
+            state = "FAILED" if sev in ("ERROR", "CRITICAL") else "RUNNING"
+            self._diagnostics[mod] = ModuleDiagnostics(
+                module_name=mod,
+                current_state=state,
+                last_error=msg or None,
+                last_error_traceback=None,
+                fail_count=1 if state == "FAILED" else 0,
+                last_failure_time=(
+                    "2026-07-16T12:00:00" if state == "FAILED" else None
+                ),
+            )
 
-    async def all_diagnostics(self) -> dict:
-        return {"diagnostics": self._diagnostics}
+    async def all_diagnostics(self) -> dict[str, ModuleDiagnostics]:
+        return dict(self._diagnostics)
 
 
 class _SlowGuardian:
     """Guardian module that sleeps beyond the configured timeout."""
 
-    async def all_diagnostics(self) -> dict:
+    async def all_diagnostics(self) -> dict[str, ModuleDiagnostics]:
         await asyncio.sleep(10)
-        return {"diagnostics": []}
+        return {}
 
 
 class _FakeChronicle:
@@ -485,33 +506,32 @@ class TestStatusCoordinatorLifecycle:
 
 
 class TestStatusOtherToolsStillStubs:
-    """Non-status, non-health tools still return ERR_NOT_IMPLEMENTED."""
+    """Non-status, non-health, non-history tools still return ERR_NOT_IMPLEMENTED."""
 
     @pytest.fixture
     def coordinator(self) -> ApochCoordinator:
         return ApochCoordinator(ServiceRegistry())
 
-    async def test_history_stub(self, coordinator: ApochCoordinator) -> None:
-        result = await coordinator.history()
-        assert result["ok"] is False
-        assert result["error"]["code"] == "ERR_NOT_IMPLEMENTED"
-
-    async def test_recommend_stub(self, coordinator: ApochCoordinator) -> None:
+    async def test_recommend_is_implemented(self, coordinator: ApochCoordinator) -> None:
         result = await coordinator.recommend()
+        # Empty registry → no modules → ERR_TIMEOUT (recommend is implemented, no longer a stub)
         assert result["ok"] is False
-        assert result["error"]["code"] == "ERR_NOT_IMPLEMENTED"
+        assert result["error"]["code"] == "ERR_TIMEOUT"
 
-    async def test_progress_stub(self, coordinator: ApochCoordinator) -> None:
+    async def test_progress_is_implemented(self, coordinator: ApochCoordinator) -> None:
         result = await coordinator.progress()
+        # Empty registry → pulse None → ERR_DEPENDENCY_UNAVAILABLE (not ERR_NOT_IMPLEMENTED)
         assert result["ok"] is False
-        assert result["error"]["code"] == "ERR_NOT_IMPLEMENTED"
+        assert result["error"]["code"] == "ERR_DEPENDENCY_UNAVAILABLE"
 
-    async def test_insights_stub(self, coordinator: ApochCoordinator) -> None:
+    async def test_insights_is_implemented(self, coordinator: ApochCoordinator) -> None:
         result = await coordinator.insights()
+        # Empty registry → optimizer None → ERR_DEPENDENCY_UNAVAILABLE (not ERR_NOT_IMPLEMENTED)
         assert result["ok"] is False
-        assert result["error"]["code"] == "ERR_NOT_IMPLEMENTED"
+        assert result["error"]["code"] == "ERR_DEPENDENCY_UNAVAILABLE"
 
-    async def test_logs_stub(self, coordinator: ApochCoordinator) -> None:
+    async def test_logs_is_implemented(self, coordinator: ApochCoordinator) -> None:
         result = await coordinator.logs()
+        # Empty registry → vision None → ERR_DEPENDENCY_UNAVAILABLE (not ERR_NOT_IMPLEMENTED)
         assert result["ok"] is False
-        assert result["error"]["code"] == "ERR_NOT_IMPLEMENTED"
+        assert result["error"]["code"] == "ERR_DEPENDENCY_UNAVAILABLE"

@@ -298,69 +298,6 @@ class VisionModule(Module):
             memory_rss_mb=self._read_memory_rss(),
         )
 
-    def get_tool_defs(self) -> list:
-        """Return MCP tool definitions for this module.
-
-        Returns:
-            List of 4 ``ToolDef`` entries (state, config, logs, system).
-        """
-        from apoch.adapters.base import ToolDef  # noqa: PLC0415
-
-        return [
-            ToolDef(
-                name="vision_state",
-                description="Return current states of loaded modules.",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "module": {
-                            "type": "string",
-                            "description": "Optional module name. Omit for all.",
-                        },
-                    },
-                },
-                handler_name="module_state",
-            ),
-            ToolDef(
-                name="vision_config",
-                description="Return effective config for a module or all modules.",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "module": {
-                            "type": "string",
-                            "description": "Optional module name. Omit for all.",
-                        },
-                    },
-                },
-                handler_name="module_config",
-            ),
-            ToolDef(
-                name="vision_logs",
-                description="Return recent structured log entries.",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "limit": {
-                            "type": "integer",
-                            "description": "Max entries (default 50).",
-                        },
-                        "level": {
-                            "type": "string",
-                            "description": "Severity filter (e.g. ERROR).",
-                        },
-                    },
-                },
-                handler_name="recent",
-            ),
-            ToolDef(
-                name="vision_system",
-                description="Return process-level health and environment info.",
-                input_schema={"type": "object", "properties": {}},
-                handler_name="system_info",
-            ),
-        ]
-
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------

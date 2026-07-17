@@ -54,7 +54,7 @@ La API MCP actual expone la arquitectura interna (vision_state, chronicle_record
 | `vision_logs` | Public | ⚡ **Advanced** | `apoch_logs` (candidato) |
 | `chronicle_record` | Public | 🔒 **Internal** | — |
 | `chronicle_query` | Public | ✅ **Public Stable** | `apoch_history` |
-| `chronicle_stats` | Public | ⚡ **Advanced** | (fusionada en history) |
+| `chronicle_stats` | Public | ⚡ **Advanced** | Absorbida en history como conteos contextuales por tipo. Sin tool independiente. Ver decisión B4. |
 | `guardian_diagnostics` | Public | ✅ **Public Stable** | `apoch_health` |
 | `guardian_all_diagnostics` | Public | ✅ **Public Stable** | (fusionado en health) |
 | `guardian_clear_diagnostics` | Public | 🔄 **Internal** (auto) | — |

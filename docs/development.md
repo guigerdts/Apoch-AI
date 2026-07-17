@@ -44,7 +44,7 @@ Ruff runs in strict mode (`select = ["E", "F", "I", "N", "W", "UP"]`). All code 
 
 ```
 src/apoch/               # Package root
-├── __init__.py           # Version: 0.7.0-alpha
+├── __init__.py           # Version: 0.9.0-alpha
 ├── __main__.py           # python -m apoch entry
 ├── cli/                  # Typer CLI commands
 │   ├── app.py            # Main Typer app + entry_point()

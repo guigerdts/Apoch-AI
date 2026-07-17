@@ -20,7 +20,7 @@ Verify the CLI works:
 
 ```
 $ uv run apoch --version
-0.7.0-alpha
+0.9.0-alpha
 ```
 
 ## 2. Check Component Status
@@ -125,8 +125,45 @@ OpenSpec (integrations)
 
 All four show `INSTALLED` — ready to use.
 
+## 6. Start the MCP Gateway
+
+Apoch-AI exposes 7 MCP tools that AI agents can call. Start the gateway:
+
+```bash
+$ uv run apoch mcp serve
+```
+
+This starts a stdio MCP server that registers 12 tools (7 public + 5 legacy aliases). The gateway remains running and blocks until interrupted.
+
+### Test that tools are registered
+
+In a second terminal:
+
+```bash
+$ uv run python -c "
+import asyncio, json
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+
+async def main():
+    async with stdio_client(StdioServerParameters(
+        command='uv', args=['run', 'apoch', 'mcp', 'serve']
+    )) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.list_tools()
+            for t in result.tools:
+                print(json.dumps({'name': t.name, 'params': list(t.inputSchema.get('properties', {}).keys())}, indent=2))
+
+asyncio.run(main())
+"
+```
+
+Expected output: 12 tools listed (7 `apoch_*` tools + 5 legacy aliases).
+
 ## Next Steps
 
+- [MCP Public API Reference](./mcp-public-api.md) — complete documentation for all 7 tools
 - [CLI Reference](./cli.md) — full command reference
 - [Configuration Guide](./configuration.md) — customize Apoch-AI
 - [Troubleshooting](./troubleshooting.md) — common issues and fixes

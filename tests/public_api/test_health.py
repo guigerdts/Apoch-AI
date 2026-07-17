@@ -27,6 +27,7 @@ import asyncio
 
 import pytest
 
+from apoch.modules.guardian.diagnostics import ModuleDiagnostics
 from apoch.public_api.coordinator import ApochCoordinator
 from apoch.public_api.registry import ServiceRegistry
 
@@ -34,21 +35,41 @@ from apoch.public_api.registry import ServiceRegistry
 
 
 class _FakeGuardian:
-    """Fake Guardian module that returns fixed diagnostics."""
+    """Fake Guardian module that returns fixed diagnostics.
+
+    Accepts test-friendly ``list[dict]`` (with keys ``severity``, ``module``,
+    ``message``) and converts internally to real ``ModuleDiagnostics`` format.
+    """
 
     def __init__(self, diagnostics: list[dict] | None = None) -> None:
-        self._diagnostics = diagnostics or []
+        raw = diagnostics or []
+        self._diagnostics: dict[str, ModuleDiagnostics] = {}
+        for d in raw:
+            mod = d.get("module", "unknown")
+            sev = d.get("severity", "WARNING")
+            msg = d.get("message", "")
+            state = "FAILED" if sev in ("ERROR", "CRITICAL") else "RUNNING"
+            self._diagnostics[mod] = ModuleDiagnostics(
+                module_name=mod,
+                current_state=state,
+                last_error=msg or None,
+                last_error_traceback=None,
+                fail_count=1 if state == "FAILED" else 0,
+                last_failure_time=(
+                    "2026-07-16T12:00:00" if state == "FAILED" else None
+                ),
+            )
 
-    async def all_diagnostics(self) -> dict:
-        return {"diagnostics": self._diagnostics}
+    async def all_diagnostics(self) -> dict[str, ModuleDiagnostics]:
+        return dict(self._diagnostics)
 
 
 class _SlowGuardian:
     """Guardian module that sleeps beyond the configured timeout."""
 
-    async def all_diagnostics(self) -> dict:
+    async def all_diagnostics(self) -> dict[str, ModuleDiagnostics]:
         await asyncio.sleep(10)
-        return {"diagnostics": []}
+        return {}
 
 
 class _FakeVision:
@@ -106,12 +127,12 @@ def critical_registry() -> ServiceRegistry:
 
 @pytest.fixture
 def mixed_problems_registry() -> ServiceRegistry:
-    """Registry: Guardian reports both WARNING and CRITICAL + Vision."""
+    """Registry: Guardian reports both WARNING and ERROR + Vision."""
     registry = ServiceRegistry()
     registry.guardian = _FakeGuardian(
         diagnostics=[
             {"severity": "WARNING", "module": "pulse", "message": "High latency"},
-            {"severity": "CRITICAL", "module": "chronicle", "message": "Down"},
+            {"severity": "ERROR", "module": "chronicle", "message": "Down"},
         ],
     )
     registry.vision = _FakeVision()
@@ -177,15 +198,17 @@ class TestHealthNoProblems:
         assert result["summary"] == "🟢 Sin problemas detectados"
         assert result["suggested_action"] == "Ninguna acción requerida"
 
-    async def test_guardian_no_diagnostics_key(self) -> None:
-        """Guardian returns dict without 'diagnostics' key → 🟢 (handles gracefully)."""
+    async def test_guardian_non_diagnostic_data(self) -> None:
+        """Guardian returns data with non-ModuleDiagnostics values → no crash."""
         registry = ServiceRegistry()
 
-        class _MissingKeyGuardian:
+        class _MixedGuardian:
             async def all_diagnostics(self) -> dict:
-                return {"status": "ok"}
+                return {
+                    "status": "ok",  # string — not ModuleDiagnostics
+                }
 
-        registry.guardian = _MissingKeyGuardian()
+        registry.guardian = _MixedGuardian()
         registry.vision = _FakeVision()
 
         coordinator = ApochCoordinator(registry)
@@ -193,6 +216,7 @@ class TestHealthNoProblems:
 
         assert result["summary"] == "🟢 Sin problemas detectados"
         assert result["suggested_action"] == "Ninguna acción requerida"
+        assert len(result["evidence"]) == 2
 
 
 class TestHealthWarnings:
@@ -244,10 +268,10 @@ class TestHealthCritical:
         assert "chronicle" in result["suggested_action"]
 
     async def test_critical_severity_error(self) -> None:
-        """ERROR severity → 🔴 summary."""
+        """ERROR severity (from FAILED state) → 🔴 summary."""
         registry = ServiceRegistry()
         registry.guardian = _FakeGuardian(
-            diagnostics=[{"severity": "ERROR", "module": "vision", "message": "Failed"}],
+            diagnostics=[{"severity": "ERROR", "module": "engine", "message": "Core failure"}],
         )
         registry.vision = _FakeVision()
 
@@ -255,20 +279,7 @@ class TestHealthCritical:
         result = await coordinator.health()
 
         assert "🔴" in result["summary"]
-
-    async def test_critical_severity_critical(self) -> None:
-        """CRITICAL severity → 🔴 summary."""
-        registry = ServiceRegistry()
-        registry.guardian = _FakeGuardian(
-            diagnostics=[{"severity": "CRITICAL", "module": "engine", "message": "Core failure"}],
-        )
-        registry.vision = _FakeVision()
-
-        coordinator = ApochCoordinator(registry)
-        result = await coordinator.health()
-
-        assert "🔴" in result["summary"]
-        assert "CRITICAL" in result["explanation"]
+        assert "[ERROR]" in result["explanation"]
 
 
 class TestHealthMixedProblems:
@@ -284,12 +295,12 @@ class TestHealthMixedProblems:
         assert result["summary"] == "🔴 Se detectaron problemas críticos en el sistema"
         # Explanation includes both problems, sorted by severity
         expl = result["explanation"]
-        assert "[CRITICAL]" in expl
+        assert "[ERROR]" in expl
         assert "[WARNING]" in expl
-        # CRITICAL should come before WARNING in sorted output
-        crit_pos = expl.index("[CRITICAL]")
+        # ERROR should come before WARNING in sorted output
+        error_pos = expl.index("[ERROR]")
         warn_pos = expl.index("[WARNING]")
-        assert crit_pos < warn_pos
+        assert error_pos < warn_pos
         # Action from the MOST severe problem
         assert "chronicle" in result["suggested_action"]
         assert "Revise el módulo" in result["suggested_action"]
@@ -545,17 +556,16 @@ class TestHealthResponseFormat:
         registry = ServiceRegistry()
 
         class _VerboseGuardian:
-            async def all_diagnostics(self) -> dict:
+            async def all_diagnostics(self) -> dict[str, ModuleDiagnostics]:
                 return {
-                    "diagnostics": [
-                        {
-                            "severity": "ERROR",
-                            "module": "vision",
-                            "message": "Something broke",
-                            "traceback": "File /usr/lib/... line 42",
-                            "internal_code": "ERR-42",
-                        },
-                    ],
+                    "vision": ModuleDiagnostics(
+                        module_name="vision",
+                        current_state="FAILED",
+                        last_error="Something broke",
+                        last_error_traceback="File /usr/lib/... line 42",
+                        fail_count=1,
+                        last_failure_time="2026-07-16T12:00:00",
+                    ),
                 }
 
         registry.guardian = _VerboseGuardian()
@@ -564,11 +574,12 @@ class TestHealthResponseFormat:
         coordinator = ApochCoordinator(registry)
         result = await coordinator.health()
 
-        # The explanation uses the message from diagnostics but should not
-        # expose tracebacks or internal codes directly.
+        # The parser extracts last_error, not the traceback
         expl = result["explanation"]
         assert "Something broke" in expl  # message is fine
-        # These are the actual explanation keys used — no traceback leakage
+        # Traceback/internal details are NOT included by the parser
+        assert "File /usr/lib/" not in expl
+        assert "traceback" not in expl.lower()
 
 
 class TestHealthToolDef:
@@ -580,14 +591,24 @@ class TestHealthToolDef:
         names = [d.name for d in defs]
         assert "apoch_health" in names
 
-    def test_get_tool_defs_has_both_tools(self) -> None:
-        """get_tool_defs includes exactly apoch_status and apoch_health."""
+    def test_get_tool_defs_has_seven_tools(self) -> None:
+        """get_tool_defs includes apoch_status through apoch_logs (PR8)."""
         defs = ApochCoordinator.get_tool_defs()
-        assert len(defs) == 2
+        assert len(defs) == 7
         assert defs[0].name == "apoch_status"
         assert defs[0].handler_name == "status"
         assert defs[1].name == "apoch_health"
         assert defs[1].handler_name == "health"
+        assert defs[2].name == "apoch_history"
+        assert defs[2].handler_name == "history"
+        assert defs[3].name == "apoch_recommend"
+        assert defs[3].handler_name == "recommend"
+        assert defs[4].name == "apoch_progress"
+        assert defs[4].handler_name == "progress"
+        assert defs[5].name == "apoch_insights"
+        assert defs[5].handler_name == "insights"
+        assert defs[6].name == "apoch_logs"
+        assert defs[6].handler_name == "logs"
 
     def test_get_tool_defs_health_descriptions(self) -> None:
         """apoch_health ToolDef has description and input_schema."""
@@ -600,55 +621,57 @@ class TestHealthToolDef:
         """get_tool_defs works on both class and instance."""
         # Via class
         defs = ApochCoordinator.get_tool_defs()
-        assert len(defs) == 2
+        assert len(defs) == 7
 
         # Via instance
         coordinator = ApochCoordinator(ServiceRegistry())
         defs_via_instance = coordinator.get_tool_defs()
-        assert len(defs_via_instance) == 2
-        assert defs_via_instance[1].name == "apoch_health"
+        assert len(defs_via_instance) == 7
+        assert defs_via_instance[4].name == "apoch_progress"
+        assert defs_via_instance[5].name == "apoch_insights"
+        assert defs_via_instance[6].name == "apoch_logs"
 
     def test_no_future_tools_in_defs(self) -> None:
-        """Only apoch_status and apoch_health are in get_tool_defs — no future tools."""
+        """Only tools up to PR8 — no tools beyond PR8."""
         defs = ApochCoordinator.get_tool_defs()
         names = {d.name for d in defs}
-        assert names == {"apoch_status", "apoch_health"}
-        # None of these should be registered yet
-        assert "apoch_history" not in names
-        assert "apoch_recommend" not in names
-        assert "apoch_progress" not in names
-        assert "apoch_insights" not in names
-        assert "apoch_logs" not in names
+        assert names == {
+            "apoch_status", "apoch_health",
+            "apoch_history", "apoch_recommend",
+            "apoch_progress", "apoch_insights",
+            "apoch_logs",
+        }
+        # PR8 — logs IS registered now
+        assert "apoch_logs" in names
 
 
 class TestHealthOtherToolsStillStubs:
-    """Other tools (non-health, non-status) still return ERR_NOT_IMPLEMENTED."""
+    """Other tools (non-health, non-status, non-history) still return ERR_NOT_IMPLEMENTED."""
 
     @pytest.fixture
     def coordinator(self) -> ApochCoordinator:
         return ApochCoordinator(ServiceRegistry())
 
-    async def test_history_stub(self, coordinator: ApochCoordinator) -> None:
-        result = await coordinator.history()
-        assert result["ok"] is False
-        assert result["error"]["code"] == "ERR_NOT_IMPLEMENTED"
-
-    async def test_recommend_stub(self, coordinator: ApochCoordinator) -> None:
+    async def test_recommend_tool_is_implemented(self, coordinator: ApochCoordinator) -> None:
         result = await coordinator.recommend()
+        # Empty registry → no modules → ERR_TIMEOUT (not ERR_NOT_IMPLEMENTED)
         assert result["ok"] is False
-        assert result["error"]["code"] == "ERR_NOT_IMPLEMENTED"
+        assert result["error"]["code"] == "ERR_TIMEOUT"
 
-    async def test_progress_stub(self, coordinator: ApochCoordinator) -> None:
+    async def test_progress_is_implemented(self, coordinator: ApochCoordinator) -> None:
         result = await coordinator.progress()
+        # Empty registry → pulse None → ERR_DEPENDENCY_UNAVAILABLE (not ERR_NOT_IMPLEMENTED)
         assert result["ok"] is False
-        assert result["error"]["code"] == "ERR_NOT_IMPLEMENTED"
+        assert result["error"]["code"] == "ERR_DEPENDENCY_UNAVAILABLE"
 
-    async def test_insights_stub(self, coordinator: ApochCoordinator) -> None:
+    async def test_insights_is_implemented(self, coordinator: ApochCoordinator) -> None:
         result = await coordinator.insights()
+        # Empty registry → optimizer None → ERR_DEPENDENCY_UNAVAILABLE
         assert result["ok"] is False
-        assert result["error"]["code"] == "ERR_NOT_IMPLEMENTED"
+        assert result["error"]["code"] == "ERR_DEPENDENCY_UNAVAILABLE"
 
-    async def test_logs_stub(self, coordinator: ApochCoordinator) -> None:
+    async def test_logs_is_implemented(self, coordinator: ApochCoordinator) -> None:
         result = await coordinator.logs()
+        # Empty registry → vision None → ERR_DEPENDENCY_UNAVAILABLE (not ERR_NOT_IMPLEMENTED)
         assert result["ok"] is False
-        assert result["error"]["code"] == "ERR_NOT_IMPLEMENTED"
+        assert result["error"]["code"] == "ERR_DEPENDENCY_UNAVAILABLE"

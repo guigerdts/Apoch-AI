@@ -12,7 +12,7 @@
 - **Guardian Module** — Exception isolation and execution boundaries, 25 tests
 - **Vision Module** — Observability suite, NDJSON logging, introspection
 - **OpenCode Adapter** — FastMCP gateway, tool dispatch, opencode.json management
-- **1,105 Tests** — Clean Ruff, `v0.7.0-alpha` tagged
+- **1,420 Tests** — Clean Ruff, `v0.9.0-alpha` tagged
 - **Test Suite** — Full coverage of all lifecycle methods, edge cases, and integration paths
 - **Documentation Completion** — 15 docs/ files covering user guide, developer guide, and reference, plus README hub
 
@@ -32,4 +32,4 @@
 | Persistent Configuration | CLI | Config file for user preferences |
 | CI/CD Pipeline | Infrastructure | GitHub Actions for tests, lint, build, release |
 
-The roadmap is governed by the Project Master (`PROJECT_MASTER.md`). Any modification requires explicit approval through the SDD process. See [development.md](development.md) for setup instructions.
+The roadmap is governed by the Project Master (`.internal/PROJECT_MASTER.md`). Any modification requires explicit approval through the SDD process. See [development.md](development.md) for setup instructions.

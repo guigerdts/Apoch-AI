@@ -8,7 +8,7 @@ All commands are run via `apoch` (or `uv run apoch` when developing from source)
 
 | Flag | Description |
 |------|-------------|
-| `--version` | Print version (`0.7.0-alpha`) and exit |
+| `--version` | Print version (`0.9.0-alpha`) and exit |
 | `--help` | Show help message and exit |
 
 ---
@@ -97,7 +97,7 @@ Show Apoch-AI version and module discovery counts.
 
 ```
 $ uv run apoch status
-  version:             0.7.0-alpha
+  version:             0.9.0-alpha
   discovered_modules:  6
   loaded_modules:      0
 ```

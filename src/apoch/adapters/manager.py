@@ -108,12 +108,20 @@ class AgentAdapterManager:
                                      services.optimizer, services.oracle]
                          if s is not None))
 
-        # 4. Register coordinator tools (progressive registration — only apoch_status in PR2).
+        # 4. Register coordinator tools (progressive registration).
         if self._coordinator is not None and hasattr(self._coordinator, "get_tool_defs"):
             coord_defs = self._coordinator.get_tool_defs()
             if coord_defs:
                 await self._adapter.register_module_tools(
                     "coordinator", self._coordinator, coord_defs
+                )
+
+        # 4b. Register legacy aliases (PR9 — backward compatibility).
+        if self._coordinator is not None and hasattr(self._coordinator, "get_legacy_aliases"):
+            legacy_defs = self._coordinator.get_legacy_aliases()
+            if legacy_defs:
+                await self._adapter.register_module_tools(
+                    "legacy", self._coordinator, legacy_defs
                 )
 
         # 5. Discover and register existing module tool definitions.

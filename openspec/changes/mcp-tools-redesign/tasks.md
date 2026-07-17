@@ -93,28 +93,52 @@ Sin Coordinator todavía. Sin registro MCP. Sin tools visibles.
 
 ## PR 4: apoch_history (Public Stable)
 
-- [ ] 4.1 Registrar `apoch_history` en MCP + implementar `ApochCoordinator.history()` con filtros horas/tipo. Tests (happy, filtros, sin datos) + validación + Go/No-Go.
-- [ ] 4.2 **Acceptance Gate**: tool visible, futuras no, ninguna ERR_NOT_IMPLEMENTED.
+- [x] 4.1 Registrar `apoch_history` en MCP + implementar `ApochCoordinator.history()` con filtros horas/tipo. Tests (happy, filtros, sin datos, validación, constraints, chronicle no disponible, acceptance gate) + validación + Go/No-Go.
+- [x] 4.2 **Acceptance Gate**: tool visible, futuras no, ninguna ERR_NOT_IMPLEMENTED.
 
 ## PR 5: apoch_recommend (Public Stable)
 
-- [ ] 5.1 Registrar `apoch_recommend` en MCP + implementar `ApochCoordinator.recommend()` orquestando Oracle, Optimizer, Pulse, Guardian, Vision. Tests (recomendación, sin datos, Oracle no disponible) + validación + Go/No-Go.
+- [ ] 5.1 Registrar `apoch_recommend` en MCP + implementar `ApochCoordinator.recommend()` usando formato RecommendResponse (summary=acción, explanation=justificación, priority=HIGH|MEDIUM|LOW, suggested_action=None). Orquesta Oracle (opcional), Optimizer, Pulse, Guardian, Vision. Tests (recomendación desde Oracle, sin recomendaciones, datos insuficientes, Oracle no disponible con Guardian+Vision, sin datos de ningún módulo, validación de formato, acceptance gate) + validación + Go/No-Go.
 - [ ] 5.2 **Acceptance Gate**: tool visible, futuras no, ninguna ERR_NOT_IMPLEMENTED.
 
 ## PR 6: apoch_progress (Experimental)
 
-- [ ] 6.1 Registrar `apoch_progress` en MCP + implementar `ApochCoordinator.progress()` con filtro periodo. Tests (datos, sin datos, tendencia) + validación + Go/No-Go.
-- [ ] 6.2 **Acceptance Gate**: tool visible, futuras no, ninguna ERR_NOT_IMPLEMENTED.
+- [x] 6.1 Registrar `apoch_progress` en MCP + implementar `ApochCoordinator.progress()` con filtro periodo. Tests (datos, sin datos, tendencia) + validación + Go/No-Go.
+- [x] 6.2 **Acceptance Gate**: tool visible, futuras no, ninguna ERR_NOT_IMPLEMENTED.
 
 ## PR 7: apoch_insights (Experimental)
 
-- [ ] 7.1 Registrar `apoch_insights` en MCP + implementar `ApochCoordinator.insights()` orquestando Optimizer, Pulse. Tests (oportunidades, sin datos, Optimizer no disponible) + validación + Go/No-Go.
-- [ ] 7.2 **Acceptance Gate**: tool visible, futuras no, ninguna ERR_NOT_IMPLEMENTED.
+- [x] 7.1 Implementar `ApochCoordinator.insights()` con:
+  - Consulta a Optimizer via servicios cross-module (`self._services.optimizer`).
+  - Filtro determinístico de hypotheses: solo `type=pattern`. Excluir `type=opportunity` y `type=anomaly`.
+  - Confianza según fórmula: `round(hypothesis_avg * pulse_factor, 2)`.
+    - `hypothesis_avg`: promedio de confidence de las hypotheses que pasaron el filtro. 0.0 si ninguna.
+    - `pulse_factor`: 1.0 (Pulse OK), 0.7 (Pulse timeout), 0.5 (Pulse no disponible).
+  - Traducción de cada hypothesis a 1-2 frases en lenguaje natural. Nunca serializar `evidence` dict.
+  - Etiquetas funcionales P6 para evidence pública ("Sistema de rendimiento", "Sistema de optimización").
+  - Pulse como módulo opcional (degraded mode con factor 0.7). Si Pulse timeout → respuesta válida sin error.
+  - suggested_action siempre None.
+  - Tests: happy path ambos módulos, Pulse timeout, sin patrones, solo opportunities/anomalies (sin detectar), Optimizer no disponible, filtro de type, confidence calculation, output contract sin datos internos de Optimizer.
+- [x] 7.2 **Acceptance Gate**: Registrar `apoch_insights` en MCP. Tool visible en get_tool_defs(), futuras (logs) siguen stubs, ninguna ERR_NOT_IMPLEMENTED.
 
 ## PR 8: apoch_logs (Advanced)
 
-- [ ] 8.1 Registrar `apoch_logs` en MCP + implementar `ApochCoordinator.logs()` con filtros nivel/límite/módulo. Tests (filtros, sin resultados, límite) + validación + Go/No-Go.
-- [ ] 8.2 **Acceptance Gate**: tool visible, futuras no, ninguna ERR_NOT_IMPLEMENTED.
+- [ ] 8.1 Implementar `ApochCoordinator.logs()` con:
+  - Consulta a Vision via servicios cross-module (`self._services.vision`).
+  - Llamada a `vision.recent(limit=limite, level=nivel)` (método async).
+  - Validación de parámetros:
+    - `nivel` debe ser uno de: INFO, WARN, ERROR, FATAL. Otro valor → `ERR_INVALID_ARGUMENT`.
+    - `limite` debe ser entero positivo > 0. Default 50. No válido → `ERR_INVALID_ARGUMENT`.
+  - Filtro por `modulo` en memoria después de obtener resultados de Vision.
+  - Cuando se usan `modulo` + `limite` simultáneamente, aplicar límite DESPUÉS del filtro por módulo.
+  - Formato de salida: una entrada por línea como `[timestamp] LEVEL [module] — mensaje`.
+  - Confidence: 1.0 (datos), 0.3 (vacío), error si Vision no disponible.
+  - suggested_action siempre None.
+  - Protección P6: NO exponer `context`, `pid`, objetos LogRecord, rutas, config, o estructuras internas de Vision.
+  - Evidence con etiquetas funcionales P6 ("Sistema de monitoreo").
+  - Vision requerido — no degraded mode.
+  - Tests: happy path, filtro por nivel, filtro por módulo, módulo + límite, límite, sin resultados, Vision timeout, Vision no disponible, parámetros inválidos (nivel, límite), output contract sin context/pid, confidence, tool def registration (7 tools), logs_stub removido de tests de otras tools.
+- [ ] 8.2 **Acceptance Gate**: Registrar `apoch_logs` en MCP. Tool visible en get_tool_defs() (7 tools). Ninguna ERR_NOT_IMPLEMENTED restante en el Coordinator.
 
 ## PR 9: Backward Compatibility
 

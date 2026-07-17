@@ -28,26 +28,32 @@ from mcp.types import CallToolResult
 # ---------------------------------------------------------------------------
 
 EXPECTED_TOOLS = frozenset({
-    "chronicle_record",
+    # Public MCP tools (PR2–PR8)
+    "apoch_status",
+    "apoch_health",
+    "apoch_history",
+    "apoch_recommend",
+    "apoch_progress",
+    "apoch_insights",
+    "apoch_logs",
+    # Legacy aliases (PR9)
+    "vision_state",
     "chronicle_query",
-    "chronicle_stats",
     "guardian_diagnostics",
     "guardian_all_diagnostics",
-    "guardian_clear_diagnostics",
-    "guardian_clear_all",
-    "vision_state",
-    "vision_config",
     "vision_logs",
-    "vision_system",
 })
 
 SAFE_TOOLS: dict[str, dict[str, Any]] = {
-    "chronicle_stats": {},
-    "guardian_all_diagnostics": {},
-    "guardian_clear_all": {},
+    "apoch_status": {},
+    "apoch_health": {},
+    "apoch_recommend": {},
+    "apoch_progress": {},
+    "apoch_insights": {},
+    # Legacy aliases (PR9) — safe, no side effects
     "vision_state": {},
-    "vision_config": {},
-    "vision_system": {},
+    "guardian_all_diagnostics": {},
+    "vision_logs": {},
 }
 
 SERVER_PARAMS = StdioServerParameters(
@@ -144,16 +150,12 @@ class TestToolInvocation:
             )
             assert result.content, f"Tool '{tool_name}' returned empty content"
 
-    async def test_vision_state_returns_dict(self, mcp_session: ClientSession) -> None:
+    async def test_legacy_alias_vision_state(self, mcp_session: ClientSession) -> None:
         result = await mcp_session.call_tool("vision_state", {})
         assert result.isError is False
         assert result.content is not None
 
-    async def test_chronicle_stats_returns_stats(self, mcp_session: ClientSession) -> None:
-        result = await mcp_session.call_tool("chronicle_stats", {})
-        assert result.isError is False
-
-    async def test_guardian_diagnostics_with_valid_module(self, mcp_session: ClientSession) -> None:
+    async def test_legacy_alias_guardian_diagnostics(self, mcp_session: ClientSession) -> None:
         result = await mcp_session.call_tool(
             "guardian_diagnostics",
             {"module_name": "ChronicleModule"},
