@@ -52,6 +52,7 @@ class AgentAdapterManager:
         self._config: dict[str, Any] = config or {}
         self._engine: Engine | None = None
         self._coordinator: ApochCoordinator | None = None
+        self._pulse_subscriber: Any | None = None
 
     # ------------------------------------------------------------------
     # Public accessors
@@ -101,12 +102,34 @@ class AgentAdapterManager:
             optimizer=loaded.get("optimizer"),
             oracle=loaded.get("oracle"),
         )
-        self._coordinator = ApochCoordinator(services)
-        logger.info("ApochCoordinator created with %d service(s)",
-                     sum(1 for s in [services.vision, services.chronicle,
-                                     services.guardian, services.pulse,
-                                     services.optimizer, services.oracle]
-                         if s is not None))
+        self._coordinator = ApochCoordinator(services, event_bus=self._engine.events)
+        logger.info(
+            "ApochCoordinator created with %d service(s)",
+            sum(
+                1
+                for s in [
+                    services.vision,
+                    services.chronicle,
+                    services.guardian,
+                    services.pulse,
+                    services.optimizer,
+                    services.oracle,
+                ]
+                if s is not None
+            ),
+        )
+
+        # 3b. Wire PulseEventSubscriber for auto-instrumentation.
+        pulse_module = loaded.get("pulse")
+        if pulse_module is not None and hasattr(pulse_module, "record"):
+            from apoch.modules.pulse.events import PulseEventSubscriber
+
+            self._pulse_subscriber = PulseEventSubscriber(
+                self._engine.events,
+                pulse_module.record,
+            )
+            self._pulse_subscriber.start()
+            logger.info("PulseEventSubscriber started — auto-instrumentation active")
 
         # 4. Register coordinator tools (progressive registration).
         if self._coordinator is not None and hasattr(self._coordinator, "get_tool_defs"):
@@ -120,9 +143,7 @@ class AgentAdapterManager:
         if self._coordinator is not None and hasattr(self._coordinator, "get_legacy_aliases"):
             legacy_defs = self._coordinator.get_legacy_aliases()
             if legacy_defs:
-                await self._adapter.register_module_tools(
-                    "legacy", self._coordinator, legacy_defs
-                )
+                await self._adapter.register_module_tools("legacy", self._coordinator, legacy_defs)
 
         # 5. Discover and register existing module tool definitions.
         #    Deterministic: iterate sorted module names.

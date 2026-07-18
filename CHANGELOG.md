@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.9.2-alpha] — 2026-07-18
+
+### Added
+
+- **Pulse Auto-Instrumentation (PR-1)** — Transparently captures system events as Pulse measurements without modifying any existing module (`changes/pulse-auto-instrumentation/`):
+  - `EventTopics` class with 8 canonical topic constants (`events.py`)
+  - `SystemEvent` frozen dataclass for structured event representation (`events.py`)
+  - `EventBus.emit()` now accepts both `str` and `SystemEvent` (backward compatible)
+  - `Context.event_bus` field for module access to EventBus during startup (`module.py`)
+  - Engine emits `MODULE_STARTED`, `MODULE_STOPPED`, `MODULE_FAILED` lifecycle events (`engine.py`)
+  - `PulseEventSubscriber` standalone class for transparent instrumentation (`modules/pulse/events.py`)
+  - Coordinator tool methods emit `TOOL_INVOCATION`, `TOOL_COMPLETED`, `TOOL_ERROR` via EventBus (`coordinator.py`)
+  - Auto-exclusion: events from `source="pulse"` are skipped (feedback loop prevention)
+  - Handler registry dict pattern (no if/elif chains)
+  - ADR-008 documents all architecture decisions
+  - 71 new tests (unit + integration)
+
+### Changed
+
+- `src/apoch/core/events.py` added `EventTopics`, `SystemEvent`, and `__all__` exports
+- `src/apoch/core/engine.py` sets `context.event_bus` before `start_all()`; emits module lifecycle events
+- `src/apoch/core/module.py` added `event_bus` field to `Context`
+- `src/apoch/modules/pulse/__init__.py` exports `PulseEventSubscriber`
+- `src/apoch/adapters/manager.py` wires `PulseEventSubscriber` and passes `event_bus` to coordinator
+
 ## [0.9.1-alpha] — 2026-07-17
 
 ### Fixed

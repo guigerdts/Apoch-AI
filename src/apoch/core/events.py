@@ -9,12 +9,48 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from collections.abc import Callable, Coroutine
+from dataclasses import dataclass
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 # Type alias for an async event handler that accepts ``**kwargs``.
 EventHandler = Callable[..., Coroutine[Any, Any, None]]
+
+
+class EventTopics:
+    """Canonical event topic constants.
+
+    All event topic strings MUST reference these constants — never raw strings.
+    """
+
+    ENGINE_STARTED: str = "engine.started"
+    ENGINE_STOPPING: str = "engine.stopping"
+    MODULE_STARTED: str = "module.started"
+    MODULE_STOPPED: str = "module.stopped"
+    MODULE_FAILED: str = "module.failed"
+    TOOL_INVOCATION: str = "tool.invocation"
+    TOOL_COMPLETED: str = "tool.completed"
+    TOOL_ERROR: str = "tool.error"
+
+
+@dataclass(frozen=True)
+class SystemEvent:
+    """Immutable event passed through the EventBus.
+
+    Fields:
+        event_id:  ``uuid4.hex`` — unique identifier.
+        topic:     From :class:`EventTopics` constants.
+        source:    Module name, ``"engine"``, or ``"coordinator"``.
+        timestamp: ISO 8601 UTC string.
+        payload:   Context-specific data dict (immutable after construction).
+    """
+
+    event_id: str
+    topic: str
+    source: str
+    timestamp: str
+    payload: dict
 
 
 class EventBus:
@@ -68,12 +104,21 @@ class EventBus:
     # Emission
     # ------------------------------------------------------------------
 
-    async def emit(self, event: str, **kwargs: Any) -> None:
+    async def emit(self, event: str | SystemEvent, **kwargs: Any) -> None:
         """Emit an event, calling all registered handlers.
+
+        Accepts either a plain *event* string (with **kwargs) or a
+        :class:`SystemEvent` instance.  When called with a ``SystemEvent``,
+        the topic is derived from ``event.topic`` and all ``event.payload``
+        items are passed as kwargs alongside the ``event`` keyword.
 
         Exceptions from individual handlers are caught and logged so
         that one failing handler does not prevent others from running.
         """
+        if isinstance(event, SystemEvent):
+            await self._emit_system_event(event)
+            return
+
         for handler in self._handlers.get(event, []):
             try:
                 await handler(**kwargs)
@@ -85,6 +130,19 @@ class EventBus:
                     exc,
                 )
 
+    async def _emit_system_event(self, event: SystemEvent) -> None:
+        """Emit a SystemEvent to handlers registered for ``event.topic``."""
+        for handler in self._handlers.get(event.topic, []):
+            try:
+                await handler(event=event, **event.payload)
+            except Exception as exc:
+                logger.exception(
+                    "Event handler '%s' failed for system event '%s': %s",
+                    handler.__name__,
+                    event.topic,
+                    exc,
+                )
+
     # ------------------------------------------------------------------
     # Lifetime
     # ------------------------------------------------------------------
@@ -92,3 +150,11 @@ class EventBus:
     def clear(self) -> None:
         """Remove all registered handlers."""
         self._handlers.clear()
+
+
+__all__ = [
+    "EventBus",
+    "EventHandler",
+    "EventTopics",
+    "SystemEvent",
+]

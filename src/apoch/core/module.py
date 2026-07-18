@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from apoch.core.exceptions import LifecycleError, StateTransitionError
 
 if TYPE_CHECKING:
+    from apoch.core.events import EventBus
     from apoch.core.registry import ModuleRegistry
 
 # ---------------------------------------------------------------------------
@@ -85,6 +86,13 @@ class Context:
 
     registry: ModuleRegistry | None = None
     """Read-only reference to the ModuleRegistry for state queries.
+
+    Set by ``Engine.start()`` before ``start_all()``.  ``None`` if
+    the Engine has not started yet or has been stopped.
+    """
+
+    event_bus: EventBus | None = None
+    """Reference to the Engine's EventBus for subscribing to system events.
 
     Set by ``Engine.start()`` before ``start_all()``.  ``None`` if
     the Engine has not started yet or has been stopped.

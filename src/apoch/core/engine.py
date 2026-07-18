@@ -16,10 +16,12 @@ Design: Data Flow (Startup Flow, Shutdown Flow)
 from __future__ import annotations
 
 import logging
+import uuid
+from datetime import UTC, datetime
 from typing import Any
 
-from apoch.core.events import EventBus
-from apoch.core.module import Context
+from apoch.core.events import EventBus, EventTopics, SystemEvent
+from apoch.core.module import Context, ModuleState
 from apoch.core.registry import ModuleRegistry
 
 logger = logging.getLogger(__name__)
@@ -89,8 +91,34 @@ class Engine:
         # Start all loaded modules.
         self._context = Context()
         self._context.registry = self._registry
+        self._context.event_bus = self._events
         await self._registry.start_all(self._context)
         logger.info("Engine started — %d module(s) running", len(loaded_names))
+
+        # Emit module lifecycle events after start_all
+        for name, mod in self._registry.loaded.items():
+            mod_state = getattr(mod, "state", None)
+            ts = datetime.now(UTC).isoformat()
+            if mod_state == ModuleState.RUNNING:
+                await self._events.emit(
+                    SystemEvent(
+                        event_id=uuid.uuid4().hex,
+                        topic=EventTopics.MODULE_STARTED,
+                        source=name,
+                        timestamp=ts,
+                        payload={},
+                    )
+                )
+            elif mod_state == ModuleState.FAILED:
+                await self._events.emit(
+                    SystemEvent(
+                        event_id=uuid.uuid4().hex,
+                        topic=EventTopics.MODULE_FAILED,
+                        source=name,
+                        timestamp=ts,
+                        payload={},
+                    )
+                )
 
         await self._events.emit("engine.started")
 
@@ -98,9 +126,31 @@ class Engine:
         """Gracefully shut down all modules in reverse init order."""
         logger.info("Engine stopping...")
         await self._events.emit("engine.stopping")
+
+        # Capture module states before stop_all transitions them
+        pre_stop_states = {
+            name: mod.state
+            for name, mod in self._registry.loaded.items()
+            if getattr(mod, "state", None) == ModuleState.RUNNING
+        }
+
         await self._registry.stop_all()
         self._context = None
         logger.info("Engine stopped")
+
+        # Emit MODULE_STOPPED for modules that were RUNNING
+        ts = datetime.now(UTC).isoformat()
+        for name in pre_stop_states:
+            await self._events.emit(
+                SystemEvent(
+                    event_id=uuid.uuid4().hex,
+                    topic=EventTopics.MODULE_STOPPED,
+                    source=name,
+                    timestamp=ts,
+                    payload={},
+                )
+            )
+
         await self._events.emit("engine.stopped")
 
     # ------------------------------------------------------------------

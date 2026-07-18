@@ -18,8 +18,11 @@ def __getattr__(name: str) -> object:
     if name == "PulseStore":
         module = importlib.import_module("apoch.modules.pulse.storage")
         return module.PulseStore
+    if name == "PulseEventSubscriber":
+        module = importlib.import_module("apoch.modules.pulse.events")
+        return module.PulseEventSubscriber
     msg = f"module {__name__!r} has no attribute {name!r}"
     raise AttributeError(msg)
 
 
-__all__ = ["PulseModule", "PulseStore"]
+__all__ = ["PulseModule", "PulseEventSubscriber", "PulseStore"]

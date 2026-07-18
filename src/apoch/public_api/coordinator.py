@@ -13,10 +13,12 @@ Architecture constraints:
 from __future__ import annotations
 
 import asyncio
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from apoch.adapters.base import ToolDef
+from apoch.core.events import EventBus, EventTopics, SystemEvent
 from apoch.public_api.errors import error_response
 from apoch.public_api.models import EvidenceSource
 from apoch.public_api.registry import ServiceRegistry
@@ -115,9 +117,46 @@ class ApochCoordinator:
         self,
         services: ServiceRegistry,
         timeouts: dict[str, float] | None = None,
+        event_bus: EventBus | None = None,
     ) -> None:
         self._services = services
         self._timeouts: dict[str, float] = timeouts or dict(DEFAULT_TIMEOUTS)
+        self._event_bus: EventBus | None = event_bus
+
+    # ── Internal: Tool event emission ─────────────────────────────────────
+
+    async def _emit_tool_event(self, topic: str, tool_name: str, **extra: Any) -> None:
+        """Emit a tool-related SystemEvent if event_bus is set.
+
+        No-op when ``self._event_bus`` is ``None`` (backward compatible).
+        """
+        if self._event_bus is None:
+            return
+        event = SystemEvent(
+            event_id=uuid.uuid4().hex,
+            topic=topic,
+            source="coordinator",
+            timestamp=datetime.now(UTC).isoformat(),
+            payload={"tool": tool_name, **extra},
+        )
+        await self._event_bus.emit(event)
+
+    async def _emit_tool_result(self, tool_name: str, response: dict[str, Any]) -> dict[str, Any]:
+        """Emit TOOL_COMPLETED or TOOL_ERROR based on *response*.
+
+        Helper that emits the appropriate completion event and returns
+        the response unchanged.  No-op when ``self._event_bus`` is ``None``.
+        """
+        if self._event_bus is not None:
+            if response.get("error"):
+                await self._emit_tool_event(
+                    EventTopics.TOOL_ERROR,
+                    tool_name,
+                    code=response["error"].get("code", "ERR_UNKNOWN"),
+                )
+            else:
+                await self._emit_tool_event(EventTopics.TOOL_COMPLETED, tool_name)
+        return response
 
     # ── Internal: Module query engine ─────────────────────────────────────
 
@@ -179,14 +218,14 @@ class ApochCoordinator:
             else:
                 continue  # no active issue
 
-            message: str = diag.last_error or (
-                f"Module {module_name} is in {state} state"
+            message: str = diag.last_error or (f"Module {module_name} is in {state} state")
+            problems.append(
+                {
+                    "severity": severity,
+                    "module": module_name,
+                    "message": message,
+                }
             )
-            problems.append({
-                "severity": severity,
-                "module": module_name,
-                "message": message,
-            })
 
         return problems
 
@@ -322,17 +361,12 @@ class ApochCoordinator:
                     "properties": {
                         "horas": {
                             "type": "integer",
-                            "description": (
-                                "Últimas N horas a consultar (default: 24)"
-                            ),
+                            "description": ("Últimas N horas a consultar (default: 24)"),
                         },
                         "tipo": {
                             "type": "string",
                             "enum": ["lifecycle", "tool", "error"],
-                            "description": (
-                                "Filtro por tipo de evento: "
-                                "lifecycle, tool, error"
-                            ),
+                            "description": ("Filtro por tipo de evento: lifecycle, tool, error"),
                         },
                     },
                 },
@@ -360,8 +394,7 @@ class ApochCoordinator:
                             "type": "string",
                             "enum": ["hoy", "semana", "mes"],
                             "description": (
-                                "Periodo a consultar: None (últimas 24h), "
-                                "hoy, semana, mes"
+                                "Periodo a consultar: None (últimas 24h), hoy, semana, mes"
                             ),
                         },
                     },
@@ -393,15 +426,11 @@ class ApochCoordinator:
                         },
                         "limite": {
                             "type": "integer",
-                            "description": (
-                                "Máximo de entradas a devolver (default: 50)."
-                            ),
+                            "description": ("Máximo de entradas a devolver (default: 50)."),
                         },
                         "modulo": {
                             "type": "string",
-                            "description": (
-                                "Filtro por módulo (aplica en memoria)."
-                            ),
+                            "description": ("Filtro por módulo (aplica en memoria)."),
                         },
                     },
                 },
@@ -447,8 +476,7 @@ class ApochCoordinator:
             ToolDef(
                 name="chronicle_query",
                 description=(
-                    "[DEPRECATED] Use apoch_history instead. "
-                    "Query recorded activity events."
+                    "[DEPRECATED] Use apoch_history instead. Query recorded activity events."
                 ),
                 input_schema={
                     "type": "object",
@@ -510,8 +538,7 @@ class ApochCoordinator:
             ToolDef(
                 name="vision_logs",
                 description=(
-                    "[DEPRECATED] Use apoch_logs instead. "
-                    "Return recent structured log entries."
+                    "[DEPRECATED] Use apoch_logs instead. Return recent structured log entries."
                 ),
                 input_schema={
                     "type": "object",
@@ -539,42 +566,52 @@ class ApochCoordinator:
         Spec: mcp-public-api §Tool 1: apoch_status, §Niveles de Confianza
         Design: ADR-001 (orchestration), ADR-004 (timeouts), ADR-007 (concurrency)
         """
+        await self._emit_tool_event(EventTopics.TOOL_INVOCATION, "status")
         queries: list[tuple[str, Any, float]] = []
 
         # Vision — module_state() (mandatory)
         if self._services.vision is not None and hasattr(self._services.vision, "module_state"):
-            queries.append((
-                "vision",
-                self._services.vision.module_state(),
-                self._timeouts.get("vision", 1.0),
-            ))
+            queries.append(
+                (
+                    "vision",
+                    self._services.vision.module_state(),
+                    self._timeouts.get("vision", 1.0),
+                )
+            )
 
         # Guardian — all_diagnostics() (mandatory)
-        if (self._services.guardian is not None
-                and hasattr(self._services.guardian, "all_diagnostics")):
-            queries.append((
-                "guardian",
-                self._services.guardian.all_diagnostics(),
-                self._timeouts.get("guardian", 0.5),
-            ))
+        if self._services.guardian is not None and hasattr(
+            self._services.guardian, "all_diagnostics"
+        ):
+            queries.append(
+                (
+                    "guardian",
+                    self._services.guardian.all_diagnostics(),
+                    self._timeouts.get("guardian", 0.5),
+                )
+            )
 
         # Chronicle — query() with recent events limit AND window (mandatory)
         if self._services.chronicle is not None and hasattr(self._services.chronicle, "query"):
             window = timedelta(minutes=STATUS_RECENT_WINDOW_MINUTES)
             since = (datetime.now(UTC) - window).isoformat()
-            queries.append((
-                "chronicle",
-                self._services.chronicle.query(since=since, limit=STATUS_RECENT_EVENTS_LIMIT),
-                self._timeouts.get("chronicle", 0.5),
-            ))
+            queries.append(
+                (
+                    "chronicle",
+                    self._services.chronicle.query(since=since, limit=STATUS_RECENT_EVENTS_LIMIT),
+                    self._timeouts.get("chronicle", 0.5),
+                )
+            )
 
         # Oracle — status/recommend (optional)
         if self._services.oracle is not None and hasattr(self._services.oracle, "status"):
-            queries.append((
-                "oracle",
-                self._services.oracle.status(),
-                self._timeouts.get("oracle", 2.0),
-            ))
+            queries.append(
+                (
+                    "oracle",
+                    self._services.oracle.status(),
+                    self._timeouts.get("oracle", 2.0),
+                )
+            )
 
         results = await self._query_modules(queries)
 
@@ -586,17 +623,16 @@ class ApochCoordinator:
 
         # Determine overall state (shared parser — real ModuleDiagnostics format).
         status_diagnostics = self._parse_guardian_diagnostics(guardian_data)
-        has_problems = any(
-            d.get("severity") in ("ERROR", "CRITICAL") for d in status_diagnostics
-        )
+        has_problems = any(d.get("severity") in ("ERROR", "CRITICAL") for d in status_diagnostics)
 
-        all_mandatory = all(
-            results.get(m) is not None for m in ("vision", "guardian", "chronicle")
-        )
+        all_mandatory = all(results.get(m) is not None for m in ("vision", "guardian", "chronicle"))
         no_data = all(v is None for v in results.values())
 
         if no_data:
-            return self._build_error_response("ERR_TIMEOUT", "No modules responded")
+            return await self._emit_tool_result(
+                "status",
+                self._build_error_response("ERR_TIMEOUT", "No modules responded"),
+            )
 
         if has_problems:
             summary = "🔴 Sistema operativo con problemas detectados"
@@ -608,11 +644,7 @@ class ApochCoordinator:
         # Build explanation.
         parts: list[str] = []
         if vision_data is not None:
-            items_count = (
-                len(vision_data)
-                if isinstance(vision_data, (list, dict))
-                else 0
-            )
+            items_count = len(vision_data) if isinstance(vision_data, (list, dict)) else 0
             if items_count:
                 parts.append(f"{items_count} componentes activos")
             else:
@@ -633,20 +665,20 @@ class ApochCoordinator:
 
         # Determine suggested_action.
         if oracle_data is not None:
-            suggested_action = (
-                oracle_data.get("suggested_action")
-                or "Ninguna acción requerida"
-            )
+            suggested_action = oracle_data.get("suggested_action") or "Ninguna acción requerida"
         elif has_problems:
             suggested_action = "Revise los problemas detectados"
         else:
             suggested_action = "Ninguna acción requerida"
 
-        return self._build_success_response(
-            results=results,
-            summary=summary,
-            explanation=explanation,
-            suggested_action=suggested_action,
+        return await self._emit_tool_result(
+            "status",
+            self._build_success_response(
+                results=results,
+                summary=summary,
+                explanation=explanation,
+                suggested_action=suggested_action,
+            ),
         )
 
     async def history(
@@ -667,6 +699,7 @@ class ApochCoordinator:
         - NEVER: Pulse/Progress/Insights replacement
         - suggested_action is always None (pure query)
         """
+        await self._emit_tool_event(EventTopics.TOOL_INVOCATION, "history")
         # ── Validate parameters ──────────────────────────────────────────
         if horas is not None and (not isinstance(horas, int) or horas <= 0):
             return self._build_error_response(
@@ -686,8 +719,7 @@ class ApochCoordinator:
 
         # ── Query Chronicle ──────────────────────────────────────────────
         queries: list[tuple[str, Any, float]] = []
-        if (self._services.chronicle is not None
-                and hasattr(self._services.chronicle, "query")):
+        if self._services.chronicle is not None and hasattr(self._services.chronicle, "query"):
             from apoch.modules.chronicle.models import EventFilter  # noqa: PLC0415
 
             ef: EventFilter | None = None
@@ -695,15 +727,17 @@ class ApochCoordinator:
                 chronicle_type = _TYPE_MAP.get(tipo, tipo)
                 ef = EventFilter(type=chronicle_type)
 
-            queries.append((
-                "chronicle",
-                self._services.chronicle.query(
-                    event_filter=ef,
-                    since=since,
-                    limit=limit,
-                ),
-                self._timeouts.get("chronicle", 0.5),
-            ))
+            queries.append(
+                (
+                    "chronicle",
+                    self._services.chronicle.query(
+                        event_filter=ef,
+                        since=since,
+                        limit=limit,
+                    ),
+                    self._timeouts.get("chronicle", 0.5),
+                )
+            )
 
         results = await self._query_modules(queries)
         chronicle_data = results.get("chronicle")
@@ -735,7 +769,8 @@ class ApochCoordinator:
             for event in events:
                 time_part = event.timestamp[11:16]
                 source_alias = _SOURCE_ALIASES.get(
-                    event.source, _SOURCE_DEFAULT,
+                    event.source,
+                    _SOURCE_DEFAULT,
                 )
 
                 if event.type == "lifecycle":
@@ -762,9 +797,7 @@ class ApochCoordinator:
             explanation = "\n".join(lines)
 
             counts_str = ", ".join(
-                f"{key}: {count}"
-                for key, count in type_counts.items()
-                if count > 0
+                f"{key}: {count}" for key, count in type_counts.items() if count > 0
             )
             if counts_str:
                 summary = (
@@ -772,10 +805,7 @@ class ApochCoordinator:
                     f"({counts_str}) en las últimas {horas} horas"
                 )
             else:
-                summary = (
-                    f"Se encontraron {len(events)} eventos "
-                    f"en las últimas {horas} horas"
-                )
+                summary = f"Se encontraron {len(events)} eventos en las últimas {horas} horas"
             confidence = 0.50
             based_on = f"{len(events)} events"
 
@@ -815,24 +845,30 @@ class ApochCoordinator:
         - Guardian is authoritative for diagnostics. Vision enriches but does not define.
         - Confidence: HIGH when both respond; MEDIUM when Guardian only.
         """
+        await self._emit_tool_event(EventTopics.TOOL_INVOCATION, "health")
         queries: list[tuple[str, Any, float]] = []
 
         # Guardian — all_diagnostics() (mandatory — health's purpose)
-        if (self._services.guardian is not None
-                and hasattr(self._services.guardian, "all_diagnostics")):
-            queries.append((
-                "guardian",
-                self._services.guardian.all_diagnostics(),
-                self._timeouts.get("guardian", 0.5),
-            ))
+        if self._services.guardian is not None and hasattr(
+            self._services.guardian, "all_diagnostics"
+        ):
+            queries.append(
+                (
+                    "guardian",
+                    self._services.guardian.all_diagnostics(),
+                    self._timeouts.get("guardian", 0.5),
+                )
+            )
 
         # Vision — module_state() (optional — enrichment)
         if self._services.vision is not None and hasattr(self._services.vision, "module_state"):
-            queries.append((
-                "vision",
-                self._services.vision.module_state(),
-                self._timeouts.get("vision", 1.0),
-            ))
+            queries.append(
+                (
+                    "vision",
+                    self._services.vision.module_state(),
+                    self._timeouts.get("vision", 1.0),
+                )
+            )
 
         results = await self._query_modules(queries)
         guardian_data = results.get("guardian")
@@ -847,21 +883,20 @@ class ApochCoordinator:
                 )
             else:
                 explanation = "No se pudo obtener diagnóstico del sistema."
-            return self._build_error_response(
-                "ERR_DEPENDENCY_UNAVAILABLE",
-                explanation,
+            return await self._emit_tool_result(
+                "health",
+                self._build_error_response(
+                    "ERR_DEPENDENCY_UNAVAILABLE",
+                    explanation,
+                ),
             )
 
         # Parse diagnostics from Guardian (shared parser — real ModuleDiagnostics format)
         diagnostics: list[dict[str, str]] = self._parse_guardian_diagnostics(guardian_data)
 
         # Classify severity
-        has_critical = any(
-            d.get("severity") in ("ERROR", "CRITICAL") for d in diagnostics
-        )
-        has_warning = any(
-            d.get("severity") == "WARNING" for d in diagnostics
-        )
+        has_critical = any(d.get("severity") in ("ERROR", "CRITICAL") for d in diagnostics)
+        has_warning = any(d.get("severity") == "WARNING" for d in diagnostics)
 
         # Build summary
         if has_critical:
@@ -934,7 +969,7 @@ class ApochCoordinator:
             confidence=health_confidence,
         )
         resp["healthy"] = healthy
-        return resp
+        return await self._emit_tool_result("health", resp)
 
     async def recommend(self) -> dict[str, Any]:
         """Next action recommendation over the Apoch-AI platform.
@@ -950,6 +985,7 @@ class ApochCoordinator:
           5. Guardian+Vision healthy → "No hay recomendaciones"
           6. All three modules fail → ERR_TIMEOUT
         """
+        await self._emit_tool_event(EventTopics.TOOL_INVOCATION, "recommend")
         queries: list[tuple[str, Any, float]] = []
 
         # Oracle — recommendations (optional, primary source)
@@ -966,28 +1002,35 @@ class ApochCoordinator:
                         return await result
                     return result
 
-                queries.append((
-                    "oracle",
-                    _fetch_oracle_recs(),
-                    self._timeouts.get("oracle", 2.0),
-                ))
+                queries.append(
+                    (
+                        "oracle",
+                        _fetch_oracle_recs(),
+                        self._timeouts.get("oracle", 2.0),
+                    )
+                )
 
         # Guardian — diagnostics (optional, fallback)
-        if (self._services.guardian is not None
-                and hasattr(self._services.guardian, "all_diagnostics")):
-            queries.append((
-                "guardian",
-                self._services.guardian.all_diagnostics(),
-                self._timeouts.get("guardian", 0.5),
-            ))
+        if self._services.guardian is not None and hasattr(
+            self._services.guardian, "all_diagnostics"
+        ):
+            queries.append(
+                (
+                    "guardian",
+                    self._services.guardian.all_diagnostics(),
+                    self._timeouts.get("guardian", 0.5),
+                )
+            )
 
         # Vision — module_state (optional, fallback enrichment)
         if self._services.vision is not None and hasattr(self._services.vision, "module_state"):
-            queries.append((
-                "vision",
-                self._services.vision.module_state(),
-                self._timeouts.get("vision", 1.0),
-            ))
+            queries.append(
+                (
+                    "vision",
+                    self._services.vision.module_state(),
+                    self._timeouts.get("vision", 1.0),
+                )
+            )
 
         results = await self._query_modules(queries)
         oracle_data: Any = results.get("oracle")
@@ -1002,9 +1045,7 @@ class ApochCoordinator:
             )
 
         # CASE 1: Oracle available with recommendations
-        if (oracle_data is not None
-                and isinstance(oracle_data, list)
-                and len(oracle_data) > 0):
+        if oracle_data is not None and isinstance(oracle_data, list) and len(oracle_data) > 0:
             rec = oracle_data[0]
             return self._build_recommend_response(
                 summary=rec.title,
@@ -1086,39 +1127,46 @@ class ApochCoordinator:
         seen: set[str] = set()
 
         if oracle_used:
-            evidence_sources.append(EvidenceSource(
-                source="Sistema de recomendaciones",
-                confidence=0.8,
-                collected_ago=0,
-                based_on="recomendación priorizada",
-            ))
+            evidence_sources.append(
+                EvidenceSource(
+                    source="Sistema de recomendaciones",
+                    confidence=0.8,
+                    collected_ago=0,
+                    based_on="recomendación priorizada",
+                )
+            )
             seen.add("oracle")
 
         if guardian_data is not None:
-            n_problems = len([
-                d for d in (guardian_data.values() if isinstance(guardian_data, dict) else [])
-                if hasattr(d, "current_state") and d.current_state == "FAILED"
-            ])
-            based_on = (
-                f"{n_problems} problema(s) activo(s)"
-                if n_problems
-                else "sin problemas detectados"
+            n_problems = len(
+                [
+                    d
+                    for d in (guardian_data.values() if isinstance(guardian_data, dict) else [])
+                    if hasattr(d, "current_state") and d.current_state == "FAILED"
+                ]
             )
-            evidence_sources.append(EvidenceSource(
-                source="Diagnóstico del sistema",
-                confidence=0.7,
-                collected_ago=0,
-                based_on=based_on,
-            ))
+            based_on = (
+                f"{n_problems} problema(s) activo(s)" if n_problems else "sin problemas detectados"
+            )
+            evidence_sources.append(
+                EvidenceSource(
+                    source="Diagnóstico del sistema",
+                    confidence=0.7,
+                    collected_ago=0,
+                    based_on=based_on,
+                )
+            )
             seen.add("guardian")
 
         if vision_data is not None and "vision" not in seen:
-            evidence_sources.append(EvidenceSource(
-                source="Estado de componentes",
-                confidence=0.6,
-                collected_ago=0,
-                based_on="estado de módulos",
-            ))
+            evidence_sources.append(
+                EvidenceSource(
+                    source="Estado de componentes",
+                    confidence=0.6,
+                    collected_ago=0,
+                    based_on="estado de módulos",
+                )
+            )
 
         return [e.to_dict() for e in evidence_sources]
 
@@ -1249,9 +1297,7 @@ class ApochCoordinator:
             return {
                 "api_version": API_VERSION,
                 "summary": "No hay datos de actividad para el período solicitado.",
-                "explanation": (
-                    "No hay datos de actividad en el período seleccionado."
-                ),
+                "explanation": ("No hay datos de actividad en el período seleccionado."),
                 "evidence": [e.to_dict() for e in evidence],
                 "suggested_action": None,
                 "confidence": 0.3,
@@ -1264,7 +1310,8 @@ class ApochCoordinator:
         total_count = len(pulse_list)
         trend_points = pulse_trend if isinstance(pulse_trend, list) else []
         trend_label, trend_desc = self._interpret_progress_trend(
-            total_count, trend_points,
+            total_count,
+            trend_points,
         )
 
         # ── Build summary ───────────────────────────────────────────────
@@ -1277,8 +1324,7 @@ class ApochCoordinator:
 
         # ── Build explanation ────────────────────────────────────────────
         explanation_parts: list[str] = [
-            f"Se registraron {total_count} unidades de trabajo "
-            f"en el período solicitado.",
+            f"Se registraron {total_count} unidades de trabajo en el período solicitado.",
         ]
         if trend_desc:
             explanation_parts.append(trend_desc)
@@ -1291,9 +1337,7 @@ class ApochCoordinator:
             confidence = 0.5
 
         # ── Build evidence with functional labels (P6 compliance) ────────
-        based_on = (
-            f"{total_count} unidades de trabajo"
-        )
+        based_on = f"{total_count} unidades de trabajo"
         evidence = [
             EvidenceSource(
                 source="Sistema de rendimiento",
@@ -1357,9 +1401,11 @@ class ApochCoordinator:
         if since is not None:
             try:
                 from datetime import datetime as _dt  # noqa: PLC0415
+
                 since_dt = _dt.fromisoformat(since)
                 if since_dt.tzinfo is None:
                     from datetime import UTC as _UTC  # noqa: PLC0415
+
                     since_dt = since_dt.replace(tzinfo=_UTC)
                 delta = datetime.now(UTC) - since_dt
                 horas = max(1, int(delta.total_seconds() // 3600))
@@ -1457,23 +1503,16 @@ class ApochCoordinator:
 
             if recent.work_unit_count > previous.work_unit_count:
                 return "creciente", (
-                    "La actividad está aumentando en comparación "
-                    "con el período anterior."
+                    "La actividad está aumentando en comparación con el período anterior."
                 )
             if recent.work_unit_count < previous.work_unit_count:
                 return "decreciente", (
-                    "La actividad está disminuyendo en comparación "
-                    "con el período anterior."
+                    "La actividad está disminuyendo en comparación con el período anterior."
                 )
-            return "estable", (
-                "La actividad se mantiene estable respecto "
-                "al período anterior."
-            )
+            return "estable", ("La actividad se mantiene estable respecto al período anterior.")
 
         # Data available but only one trend point — no comparison possible
-        return "estable", (
-            "Actividad registrada sin cambios significativos."
-        )
+        return "estable", ("Actividad registrada sin cambios significativos.")
 
     async def insights(self) -> dict[str, Any]:
         """Patterns and improvement opportunities.
@@ -1489,13 +1528,13 @@ class ApochCoordinator:
         - Never exposes module names, detector names, or internal stats.
         - suggested_action is always None.
         """
+        await self._emit_tool_event(EventTopics.TOOL_INVOCATION, "insights")
         queries: list[tuple[str, Any, float]] = []
         pulse_factor: float = 1.0
         opt_queried = False
 
         # ── Optimizer (required) ────────────────────────────────────────
-        if (self._services.optimizer is not None
-                and hasattr(self._services.optimizer, "services")):
+        if self._services.optimizer is not None and hasattr(self._services.optimizer, "services"):
             opt_svc = self._services.optimizer.services.get("optimizer.hypotheses")
             if opt_svc:
                 opt_queried = True
@@ -1506,11 +1545,13 @@ class ApochCoordinator:
                         return await result
                     return result
 
-                queries.append((
-                    "optimizer",
-                    _fetch_opt_hypotheses(),
-                    self._timeouts.get("optimizer", 1.0),
-                ))
+                queries.append(
+                    (
+                        "optimizer",
+                        _fetch_opt_hypotheses(),
+                        self._timeouts.get("optimizer", 1.0),
+                    )
+                )
 
         if not opt_queried:
             return self._build_error_response(
@@ -1528,11 +1569,13 @@ class ApochCoordinator:
                     return await result
                 return result
 
-            queries.append((
-                "pulse",
-                _fetch_pulse_data(),
-                self._timeouts.get("pulse", 0.5),
-            ))
+            queries.append(
+                (
+                    "pulse",
+                    _fetch_pulse_data(),
+                    self._timeouts.get("pulse", 0.5),
+                )
+            )
         else:
             pulse_factor = 0.5
 
@@ -1617,9 +1660,7 @@ class ApochCoordinator:
                     confidence=0.7,
                     collected_ago=0,
                     based_on=(
-                        f"{n_units} unidades de trabajo"
-                        if n_units
-                        else "datos de rendimiento"
+                        f"{n_units} unidades de trabajo" if n_units else "datos de rendimiento"
                     ),
                 ),
             )
@@ -1656,6 +1697,7 @@ class ApochCoordinator:
         - Filter by module is applied in memory (Vision.recent() does not support it)
         - When modulo + limite are used together, limite applies AFTER module filter
         """
+        await self._emit_tool_event(EventTopics.TOOL_INVOCATION, "logs")
         # ── Validate parameters ──────────────────────────────────────────
         resolved_limit: int = limite if limite is not None else LOGS_DEFAULT_LIMIT
         if not isinstance(resolved_limit, int) or resolved_limit <= 0:
