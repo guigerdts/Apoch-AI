@@ -294,9 +294,7 @@ class CodeGraphComponent(StackComponent):
                         "diagnostics": data,
                     }
             except json.JSONDecodeError:
-                log.warning(
-                    "Failed to parse 'codegraph status --json'; falling back to exit code"
-                )
+                log.warning("Failed to parse 'codegraph status --json'; falling back to exit code")
 
         # Fallback: exit code only
         if result.returncode == 0:

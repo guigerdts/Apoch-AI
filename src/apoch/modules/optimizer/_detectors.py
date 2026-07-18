@@ -176,8 +176,9 @@ class DegradationDetector:
                     hypotheses.append(
                         OptimizationHypothesis(
                             type="anomaly",
-                            domain="cost" if metric in ("cost", "tokens_input", "tokens_output")
-                                    else "time",
+                            domain="cost"
+                            if metric in ("cost", "tokens_input", "tokens_output")
+                            else "time",
                             confidence=conf,
                             evidence={
                                 "metric": metric,
@@ -189,8 +190,7 @@ class DegradationDetector:
                                 "unit_id": u.id,
                             },
                             affected_scope=(
-                                f"degradation in {metric} — "
-                                f"z-score {z:.2f} > {threshold}"
+                                f"degradation in {metric} — z-score {z:.2f} > {threshold}"
                             ),
                             generated_at=_now_iso(),
                         )
@@ -227,15 +227,19 @@ class ModelEfficiencyDetector:
                 continue
 
             if model not in by_model:
-                by_model[model] = {"cost_sum": 0.0, "cost_count": 0,
-                                   "time_sum": 0.0, "time_count": 0,
-                                   "total_tokens": 0, "unit_count": 0}
+                by_model[model] = {
+                    "cost_sum": 0.0,
+                    "cost_count": 0,
+                    "time_sum": 0.0,
+                    "time_count": 0,
+                    "total_tokens": 0,
+                    "unit_count": 0,
+                }
 
             g = by_model[model]
             g["unit_count"] += 1
 
-            tokens = (getattr(u, "tokens_input", 0) or 0) + \
-                     (getattr(u, "tokens_output", 0) or 0)
+            tokens = (getattr(u, "tokens_input", 0) or 0) + (getattr(u, "tokens_output", 0) or 0)
             g["total_tokens"] += tokens
 
             cost = _float_or_none(getattr(u, "cost", None))
@@ -270,9 +274,7 @@ class ModelEfficiencyDetector:
             if "avg_cost_per_token" in d
         }
         time_models = {
-            m: d["avg_time_per_unit"]
-            for m, d in model_metrics.items()
-            if "avg_time_per_unit" in d
+            m: d["avg_time_per_unit"] for m, d in model_metrics.items() if "avg_time_per_unit" in d
         }
 
         hypotheses: list[OptimizationHypothesis] = []
@@ -300,8 +302,7 @@ class ModelEfficiencyDetector:
                             "worst_model": max(cost_models, key=cost_models.get),  # type: ignore[arg-type]
                             "spread": spread,
                             "partial_cost_data": any(
-                                g["cost_count"] < g["unit_count"]
-                                for g in by_model.values()
+                                g["cost_count"] < g["unit_count"] for g in by_model.values()
                             ),
                         },
                         affected_scope=(
@@ -398,8 +399,7 @@ class AnomalyDetector:
             for v in sorted_vals:
                 if v < lower or v > upper:
                     distance = abs(v - median)
-                    max_dist = max(abs(sorted_vals[0] - median),
-                                   abs(sorted_vals[-1] - median))
+                    max_dist = max(abs(sorted_vals[0] - median), abs(sorted_vals[-1] - median))
                     raw_conf = 1.0 - (distance / max(max_dist, 1e-10))
                     conf = cap_underpowered(raw_conf, n)
 
@@ -537,12 +537,14 @@ class ReworkCorrelationDetector:
             rt = getattr(u, "rework_tokens", None)
             if rc is None and rt is None:
                 continue
-            rework_units.append({
-                "unit": u,
-                "rework_cycles": rc or 0,
-                "rework_tokens": rt or 0,
-                "model": getattr(u, "model", None) or "",
-            })
+            rework_units.append(
+                {
+                    "unit": u,
+                    "rework_cycles": rc or 0,
+                    "rework_tokens": rt or 0,
+                    "model": getattr(u, "model", None) or "",
+                }
+            )
 
         if not rework_units:
             return []
@@ -568,7 +570,7 @@ class ReworkCorrelationDetector:
         models_list = sorted(model_avg.keys())
 
         for i, m1 in enumerate(models_list):
-            for m2 in models_list[i + 1:]:
+            for m2 in models_list[i + 1 :]:
                 v1, v2 = model_avg[m1], model_avg[m2]
                 if v1 == 0 and v2 == 0:
                     continue
@@ -589,8 +591,7 @@ class ReworkCorrelationDetector:
                     # Simple correlation coefficient proxy
                     all_cycles = [ru["rework_cycles"] for ru in rework_units]
                     all_models_num = [
-                        1.0 if ru["model"] == worse_model else 0.0
-                        for ru in rework_units
+                        1.0 if ru["model"] == worse_model else 0.0 for ru in rework_units
                     ]
 
                     # Point-biserial-like correlation

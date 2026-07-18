@@ -26,9 +26,7 @@ class OptimizationHypothesis:
     """
 
     type: Literal["pattern", "anomaly", "opportunity"]
-    domain: Literal[
-        "cost", "time", "rework", "model_efficiency", "session_behavior"
-    ]
+    domain: Literal["cost", "time", "rework", "model_efficiency", "session_behavior"]
     confidence: float
     evidence: dict
     affected_scope: str

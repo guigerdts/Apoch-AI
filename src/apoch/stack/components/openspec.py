@@ -148,9 +148,7 @@ class OpenSpecComponent(StackComponent):
             )
 
         if info.installed and info.version is None:
-            log.warning(
-                "OpenSpec binary found but version could not be parsed"
-            )
+            log.warning("OpenSpec binary found but version could not be parsed")
             return OperationResult(
                 success=False,
                 component="openspec",
@@ -308,9 +306,7 @@ class OpenSpecComponent(StackComponent):
                     "falling back to exit code"
                 )
             except json.JSONDecodeError:
-                log.warning(
-                    "Failed to parse 'openspec doctor --json'; falling back to exit code"
-                )
+                log.warning("Failed to parse 'openspec doctor --json'; falling back to exit code")
 
         # Fallback: exit code only
         result = await self._runner.run(["openspec", "doctor"])

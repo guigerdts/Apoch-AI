@@ -426,8 +426,7 @@ class OpenCodeAdapter(AgentAdapter):
 
         if not candidates:
             logger.warning(
-                "Could not resolve apoch path — install may fail if "
-                "apoch is not in $PATH"
+                "Could not resolve apoch path — install may fail if apoch is not in $PATH"
             )
             return ["apoch"]
 

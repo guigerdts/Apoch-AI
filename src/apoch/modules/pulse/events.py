@@ -79,7 +79,7 @@ class PulseEventSubscriber:
     # Handlers (registry dict values — never if/elif)
     # ------------------------------------------------------------------
 
-    def _handle_tool_completed(self, event: SystemEvent, **payload: Any) -> None:  # noqa: ARG002
+    async def _handle_tool_completed(self, event: SystemEvent, **payload: Any) -> None:  # noqa: ARG002
         """Handle a TOOL_COMPLETED event."""
         if self._should_skip(event):
             return
@@ -96,7 +96,7 @@ class PulseEventSubscriber:
             )
         )
 
-    def _handle_engine_started(self, event: SystemEvent, **payload: Any) -> None:  # noqa: ARG002
+    async def _handle_engine_started(self, event: SystemEvent, **payload: Any) -> None:  # noqa: ARG002
         """Handle an ENGINE_STARTED event."""
         if self._should_skip(event):
             return
@@ -113,7 +113,7 @@ class PulseEventSubscriber:
             )
         )
 
-    def _handle_engine_stopping(self, event: SystemEvent, **payload: Any) -> None:  # noqa: ARG002
+    async def _handle_engine_stopping(self, event: SystemEvent, **payload: Any) -> None:  # noqa: ARG002
         """Handle an ENGINE_STOPPING event."""
         if self._should_skip(event):
             return

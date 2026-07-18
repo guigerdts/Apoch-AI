@@ -132,4 +132,5 @@ class GuardianModule(Module):
         """Remove all diagnostics entries."""
         self._diagnostics.clear()
 
+
 __all__ = ["GuardianModule"]

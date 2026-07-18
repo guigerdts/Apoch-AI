@@ -134,9 +134,7 @@ def _try_call(
     return fallback
 
 
-def _fmt_module_line(
-    name: str, symbol_char: str, state_label: str, detail: str = ""
-) -> str:
+def _fmt_module_line(name: str, symbol_char: str, state_label: str, detail: str = "") -> str:
     """Format a single module line for the dashboard.
 
     Example::
@@ -155,9 +153,7 @@ def _fmt_module_line(
 
 @cli_app.command()
 def dashboard(
-    json: bool = typer.Option(
-        False, "--json", help="Output in JSON format."
-    ),
+    json: bool = typer.Option(False, "--json", help="Output in JSON format."),
 ) -> None:
     """Show a compact EIL overview (default command).
 
@@ -229,10 +225,7 @@ def dashboard(
         hyps = opt_data.get("hypothesis_count", "?")
         baselines = opt_data.get("baseline_count", "?")
         pulse_ok = opt_data.get("pulse_connected", False)
-        detail = (
-            f"{hyps} hypotheses, {baselines} baselines  "
-            f"(Pulse {'✓' if pulse_ok else '✗'})"
-        )
+        detail = f"{hyps} hypotheses, {baselines} baselines  (Pulse {'✓' if pulse_ok else '✗'})"
         lines.append(_fmt_module_line("Optimizer", "●", "started", detail))
     else:
         st = _module_state(registry, "optimizer") or "not loaded"
@@ -249,9 +242,7 @@ def dashboard(
 
     # Guardian
     if guardian_mod and _module_state(registry, "guardian") == "RUNNING":
-        diags = _try_call(
-            ctx, module_ref=guardian_mod, method_name="all_diagnostics", fallback={}
-        )
+        diags = _try_call(ctx, module_ref=guardian_mod, method_name="all_diagnostics", fallback={})
         detail = f"{len(diags)} failed module{'s' if len(diags) != 1 else ''}"
         lines.append(_fmt_module_line("Guardian", "●", "started", detail))
     else:
@@ -275,9 +266,7 @@ def dashboard(
 
 @cli_app.command()
 def status(
-    json: bool = typer.Option(
-        False, "--json", help="Output in JSON format."
-    ),
+    json: bool = typer.Option(False, "--json", help="Output in JSON format."),
 ) -> None:
     """Show detailed EIL module status and service availability."""
     ctx, registry = asyncio.run(_load_and_start())
@@ -302,8 +291,7 @@ def status(
                     "name": r["name"],
                     "state": r["state"],
                     "services": [
-                        {"key": k, "description": _service_descriptor(k)}
-                        for k in r["services"]
+                        {"key": k, "description": _service_descriptor(k)} for k in r["services"]
                     ],
                 }
                 for r in rows
@@ -318,9 +306,7 @@ def status(
     lines.append("-" * 60)
     for r in rows:
         sym = _symbol(r["state"] if r["state"] != "—" else None)
-        service_str = ", ".join(
-            f"{s} ✓" for s in r["services"]
-        ) if r["services"] else "—"
+        service_str = ", ".join(f"{s} ✓" for s in r["services"]) if r["services"] else "—"
         lines.append(f"  {sym} {r['name']:<12} {r['state']:<9}  {service_str}")
     typer.echo("\n".join(lines))
 
@@ -331,9 +317,7 @@ def hypotheses(
     min_confidence: float = typer.Option(
         0.0, "--min-confidence", min=0.0, max=1.0, help="Minimum confidence filter."
     ),
-    json: bool = typer.Option(
-        False, "--json", help="Output in JSON format."
-    ),
+    json: bool = typer.Option(False, "--json", help="Output in JSON format."),
 ) -> None:
     """List optimization hypotheses from the Optimizer module."""
     ctx, registry = asyncio.run(_load_and_start())
@@ -379,9 +363,7 @@ def hypotheses(
     for h in filtered:
         htype = _HYPOTHESIS_TYPE_COLORS.get(h.type, "????")
         pct = f"{h.confidence:.0%}" if h.confidence == int(h.confidence) else f"{h.confidence:.1%}"
-        lines.append(
-            f"  [{htype}] {h.affected_scope:<40} {pct:>5}  {h.generated_at[:19]}"
-        )
+        lines.append(f"  [{htype}] {h.affected_scope:<40} {pct:>5}  {h.generated_at[:19]}")
     lines.append(f"\n  {len(filtered)} of {len(hyps)} hypotheses shown (--limit {limit})")
     typer.echo("\n".join(lines))
 
@@ -389,13 +371,12 @@ def hypotheses(
 @cli_app.command()
 def recs(
     min_priority: str = typer.Option(
-        "low", "--min-priority",
+        "low",
+        "--min-priority",
         help="Minimum priority: critical, high, medium, low.",
     ),
     limit: int = typer.Option(10, "--limit", help="Max recommendations to show."),
-    json: bool = typer.Option(
-        False, "--json", help="Output in JSON format."
-    ),
+    json: bool = typer.Option(False, "--json", help="Output in JSON format."),
 ) -> None:
     """List improvement recommendations from the Oracle module."""
     ctx, registry = asyncio.run(_load_and_start())
@@ -460,9 +441,7 @@ def recs(
 @cli_app.command()
 def trends(
     days: int = typer.Option(7, "--days", "-d", help="Number of days to trend."),
-    json: bool = typer.Option(
-        False, "--json", help="Output in JSON format."
-    ),
+    json: bool = typer.Option(False, "--json", help="Output in JSON format."),
 ) -> None:
     """Show productivity trends from the Pulse module.
 

@@ -110,10 +110,7 @@ def _bump_priority(priority: str) -> str:
 
 def _make_rec_id(hyp: OptimizationHypothesis) -> str:
     """Deterministic recommendation ID from hypothesis content."""
-    key = (
-        f"apoch/oracle/{hyp.type}/{hyp.domain}/"
-        f"{hyp.generated_at}/{hyp.confidence}"
-    )
+    key = f"apoch/oracle/{hyp.type}/{hyp.domain}/{hyp.generated_at}/{hyp.confidence}"
     return uuid.uuid5(uuid.NAMESPACE_DNS, key).hex
 
 

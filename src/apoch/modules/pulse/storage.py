@@ -130,8 +130,7 @@ class PulseStore:
                 )
             """)
             self._conn.execute(
-                "INSERT OR IGNORE INTO schema_version (version, applied_at) "
-                "VALUES (?, ?)",
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (?, ?)",
                 (1, datetime.now(UTC).isoformat()),
             )
             self._conn.commit()
@@ -191,9 +190,7 @@ class PulseStore:
                     f"store does not support overwrites."
                 ) from exc
             except sqlite3.Error as exc:
-                raise StorageError(
-                    f"Failed to save WorkUnit '{unit.id}': {exc}"
-                ) from exc
+                raise StorageError(f"Failed to save WorkUnit '{unit.id}': {exc}") from exc
         else:
             # In-memory mode
             if unit.id in self._work_units:
@@ -221,9 +218,7 @@ class PulseStore:
                 row = cursor.fetchone()
                 return _row_to_work_unit(row) if row else None
             except sqlite3.Error as exc:
-                raise StorageError(
-                    f"Failed to get WorkUnit '{work_unit_id}': {exc}"
-                ) from exc
+                raise StorageError(f"Failed to get WorkUnit '{work_unit_id}': {exc}") from exc
         return self._work_units.get(work_unit_id)
 
     def list(self, filter: WorkUnitFilter | None = None) -> list[WorkUnit]:
@@ -240,8 +235,7 @@ class PulseStore:
                 self._conn.row_factory = sqlite3.Row
                 where, params = _build_where_clause(filter)
                 cursor = self._conn.execute(
-                    f"SELECT * FROM work_units WHERE {where} "
-                    "ORDER BY created_at DESC LIMIT ?",
+                    f"SELECT * FROM work_units WHERE {where} ORDER BY created_at DESC LIMIT ?",
                     [*params, f.limit],
                 )
                 return [_row_to_work_unit(row) for row in cursor.fetchall()]

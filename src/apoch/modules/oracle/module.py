@@ -179,10 +179,12 @@ class OracleModule(Module):
             if record is None:
                 return
             for rec in recs:
-                record({
-                    "type": "recommendation_generated",
-                    "payload": asdict(rec),
-                })
+                record(
+                    {
+                        "type": "recommendation_generated",
+                        "payload": asdict(rec),
+                    }
+                )
         except Exception:  # noqa: BLE001
             log.exception("Failed to record recommendation to Chronicle")
 
@@ -197,17 +199,11 @@ class OracleModule(Module):
             A dict with ``available``, ``optimizer_connected``, and
             ``chronicle_connected``.
         """
-        services_available = (
-            self._context is not None and self._context.services is not None
-        )
+        services_available = self._context is not None and self._context.services is not None
         optimizer_connected = (
-            services_available
-            and "optimizer.hypotheses" in self._context.services
+            services_available and "optimizer.hypotheses" in self._context.services
         )
-        chronicle_connected = (
-            services_available
-            and "chronicle.record" in self._context.services
-        )
+        chronicle_connected = services_available and "chronicle.record" in self._context.services
         return {
             "available": True,
             "optimizer_connected": optimizer_connected,

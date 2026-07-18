@@ -79,9 +79,7 @@ class Analysis:
 
         if has_lines:
             # Determine window cutoff
-            created_times = [
-                u.created_at for u in units if u.created_at
-            ]
+            created_times = [u.created_at for u in units if u.created_at]
             if created_times:
                 earliest = min(created_times)
                 try:
@@ -94,8 +92,10 @@ class Analysis:
 
             if cutoff is not None:
                 filtered = [
-                    u for u in units
-                    if u.completed_at and u.created_at
+                    u
+                    for u in units
+                    if u.completed_at
+                    and u.created_at
                     and datetime.fromisoformat(u.completed_at) <= cutoff
                 ]
             else:
@@ -158,20 +158,18 @@ class Analysis:
             total_cost = sum((u.cost for u in bucket if u.cost is not None), Decimal("0"))
             total_tokens = sum(u.tokens_input + u.tokens_output for u in bucket)
             count = len(bucket)
-            avg_cost = (
-                round(total_cost / count, 4)
-                if total_cost > 0 and count > 0
-                else None
-            )
+            avg_cost = round(total_cost / count, 4) if total_cost > 0 and count > 0 else None
 
-            points.append(TrendPoint(
-                period_start=_period_start(period_key),
-                period_end=_period_end(period_key, period_days),
-                total_cost=total_cost,
-                total_tokens=total_tokens,
-                avg_cost_per_task=avg_cost,
-                work_unit_count=count,
-            ))
+            points.append(
+                TrendPoint(
+                    period_start=_period_start(period_key),
+                    period_end=_period_end(period_key, period_days),
+                    total_cost=total_cost,
+                    total_tokens=total_tokens,
+                    avg_cost_per_task=avg_cost,
+                    work_unit_count=count,
+                )
+            )
 
         return points
 
@@ -188,11 +186,7 @@ class Analysis:
         total_time = sum(u.wall_clock_s for u in units)
 
         cost_units = [u for u in units if u.cost is not None]
-        avg_cost = (
-            round(total_cost / len(cost_units), 4)
-            if cost_units
-            else None
-        )
+        avg_cost = round(total_cost / len(cost_units), 4) if cost_units else None
 
         rework_rate, rework_method = cls.rework_rate(units)
         return ProductivitySummary(

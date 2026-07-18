@@ -13,9 +13,11 @@ Architecture constraints:
 from __future__ import annotations
 
 import asyncio
+import functools
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, TypeVar
 
 from apoch.adapters.base import ToolDef
 from apoch.core.events import EventBus, EventTopics, SystemEvent
@@ -23,6 +25,8 @@ from apoch.public_api.errors import error_response
 from apoch.public_api.models import EvidenceSource
 from apoch.public_api.registry import ServiceRegistry
 from apoch.public_api.version import API_VERSION
+
+_F = TypeVar("_F", bound=Callable[..., Any])
 
 # ── Default timeouts (seconds per module) ─────────────────────────────────
 # Configurable at module level — override via subclass or instance attr.
@@ -157,6 +161,24 @@ class ApochCoordinator:
             else:
                 await self._emit_tool_event(EventTopics.TOOL_COMPLETED, tool_name)
         return response
+
+    @staticmethod
+    def _auto_emit_tool_events(method: _F) -> _F:
+        """Decorator: auto-emit TOOL_INVOCATION + TOOL_COMPLETED/TOOL_ERROR.
+
+        Wraps any public tool method so invocation and completion/error
+        events are emitted automatically.  No-op when event_bus is None
+        (handled inside _emit_tool_event / _emit_tool_result).
+        """
+        tool_name = method.__name__
+
+        @functools.wraps(method)
+        async def wrapper(self, *args: Any, **kwargs: Any) -> Any:
+            await self._emit_tool_event(EventTopics.TOOL_INVOCATION, tool_name)
+            result = await method(self, *args, **kwargs)
+            return await self._emit_tool_result(tool_name, result)
+
+        return wrapper  # type: ignore[return-value]
 
     # ── Internal: Module query engine ─────────────────────────────────────
 
@@ -557,6 +579,7 @@ class ApochCoordinator:
             ),
         ]
 
+    @_auto_emit_tool_events
     async def status(self) -> dict[str, Any]:
         """General system status — orchestrate Vision, Guardian, Chronicle, Oracle.
 
@@ -566,7 +589,6 @@ class ApochCoordinator:
         Spec: mcp-public-api §Tool 1: apoch_status, §Niveles de Confianza
         Design: ADR-001 (orchestration), ADR-004 (timeouts), ADR-007 (concurrency)
         """
-        await self._emit_tool_event(EventTopics.TOOL_INVOCATION, "status")
         queries: list[tuple[str, Any, float]] = []
 
         # Vision — module_state() (mandatory)
@@ -629,10 +651,7 @@ class ApochCoordinator:
         no_data = all(v is None for v in results.values())
 
         if no_data:
-            return await self._emit_tool_result(
-                "status",
-                self._build_error_response("ERR_TIMEOUT", "No modules responded"),
-            )
+            return self._build_error_response("ERR_TIMEOUT", "No modules responded")
 
         if has_problems:
             summary = "🔴 Sistema operativo con problemas detectados"
@@ -671,16 +690,14 @@ class ApochCoordinator:
         else:
             suggested_action = "Ninguna acción requerida"
 
-        return await self._emit_tool_result(
-            "status",
-            self._build_success_response(
-                results=results,
-                summary=summary,
-                explanation=explanation,
-                suggested_action=suggested_action,
-            ),
+        return self._build_success_response(
+            results=results,
+            summary=summary,
+            explanation=explanation,
+            suggested_action=suggested_action,
         )
 
+    @_auto_emit_tool_events
     async def history(
         self,
         horas: int | None = None,
@@ -699,7 +716,6 @@ class ApochCoordinator:
         - NEVER: Pulse/Progress/Insights replacement
         - suggested_action is always None (pure query)
         """
-        await self._emit_tool_event(EventTopics.TOOL_INVOCATION, "history")
         # ── Validate parameters ──────────────────────────────────────────
         if horas is not None and (not isinstance(horas, int) or horas <= 0):
             return self._build_error_response(
@@ -831,6 +847,7 @@ class ApochCoordinator:
             "metadata": {},
         }
 
+    @_auto_emit_tool_events
     async def health(self) -> dict[str, Any]:
         """Diagnose system health — classify problems via Guardian, enrich with Vision.
 
@@ -845,7 +862,6 @@ class ApochCoordinator:
         - Guardian is authoritative for diagnostics. Vision enriches but does not define.
         - Confidence: HIGH when both respond; MEDIUM when Guardian only.
         """
-        await self._emit_tool_event(EventTopics.TOOL_INVOCATION, "health")
         queries: list[tuple[str, Any, float]] = []
 
         # Guardian — all_diagnostics() (mandatory — health's purpose)
@@ -969,8 +985,9 @@ class ApochCoordinator:
             confidence=health_confidence,
         )
         resp["healthy"] = healthy
-        return await self._emit_tool_result("health", resp)
+        return resp
 
+    @_auto_emit_tool_events
     async def recommend(self) -> dict[str, Any]:
         """Next action recommendation over the Apoch-AI platform.
 
@@ -985,7 +1002,6 @@ class ApochCoordinator:
           5. Guardian+Vision healthy → "No hay recomendaciones"
           6. All three modules fail → ERR_TIMEOUT
         """
-        await self._emit_tool_event(EventTopics.TOOL_INVOCATION, "recommend")
         queries: list[tuple[str, Any, float]] = []
 
         # Oracle — recommendations (optional, primary source)
@@ -1204,6 +1220,7 @@ class ApochCoordinator:
             resp["expected_benefit"] = expected_benefit
         return resp
 
+    @_auto_emit_tool_events
     async def progress(self, periodo: str | None = None) -> dict[str, Any]:
         """Productivity, evolution and interpreted trends.
 
@@ -1514,6 +1531,7 @@ class ApochCoordinator:
         # Data available but only one trend point — no comparison possible
         return "estable", ("Actividad registrada sin cambios significativos.")
 
+    @_auto_emit_tool_events
     async def insights(self) -> dict[str, Any]:
         """Patterns and improvement opportunities.
 
@@ -1528,7 +1546,6 @@ class ApochCoordinator:
         - Never exposes module names, detector names, or internal stats.
         - suggested_action is always None.
         """
-        await self._emit_tool_event(EventTopics.TOOL_INVOCATION, "insights")
         queries: list[tuple[str, Any, float]] = []
         pulse_factor: float = 1.0
         opt_queried = False
@@ -1678,6 +1695,7 @@ class ApochCoordinator:
             "metadata": {},
         }
 
+    @_auto_emit_tool_events
     async def logs(
         self,
         nivel: str | None = None,
@@ -1697,7 +1715,6 @@ class ApochCoordinator:
         - Filter by module is applied in memory (Vision.recent() does not support it)
         - When modulo + limite are used together, limite applies AFTER module filter
         """
-        await self._emit_tool_event(EventTopics.TOOL_INVOCATION, "logs")
         # ── Validate parameters ──────────────────────────────────────────
         resolved_limit: int = limite if limite is not None else LOGS_DEFAULT_LIMIT
         if not isinstance(resolved_limit, int) or resolved_limit <= 0:

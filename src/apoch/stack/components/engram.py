@@ -78,7 +78,8 @@ def _get_install_args() -> list[str]:
         return ["brew", "install", "gentleman-programming/tap/engram"]
     if sys == "Windows":
         return [
-            "go", "install",
+            "go",
+            "install",
             "github.com/Gentleman-Programming/engram/cmd/engram@latest",
         ]
     # Fallback — show the brew command as representative
@@ -110,7 +111,9 @@ def _get_uninstall_args(executable_path: Path | None) -> list[str] | None:
     sys = platform.system()
     if sys == "Windows":
         return [
-            "go", "clean", "-i",
+            "go",
+            "clean",
+            "-i",
             "github.com/Gentleman-Programming/engram/cmd/engram",
         ]
 

@@ -11,16 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- **Pulse Auto-Instrumentation (PR-1)** — Transparently captures system events as Pulse measurements without modifying any existing module (`changes/pulse-auto-instrumentation/`):
-  - `EventTopics` class with 8 canonical topic constants (`events.py`)
-  - `SystemEvent` frozen dataclass for structured event representation (`events.py`)
-  - `EventBus.emit()` now accepts both `str` and `SystemEvent` (backward compatible)
-  - `Context.event_bus` field for module access to EventBus during startup (`module.py`)
-  - Engine emits `MODULE_STARTED`, `MODULE_STOPPED`, `MODULE_FAILED` lifecycle events (`engine.py`)
-  - `PulseEventSubscriber` standalone class for transparent instrumentation (`modules/pulse/events.py`)
-  - Coordinator tool methods emit `TOOL_INVOCATION`, `TOOL_COMPLETED`, `TOOL_ERROR` via EventBus (`coordinator.py`)
-  - Auto-exclusion: events from `source="pulse"` are skipped (feedback loop prevention)
-  - Handler registry dict pattern (no if/elif chains)
+- **Pulse Auto-Instrumentation (PR-1)** — Transparent instrumentation layer that captures system events as Pulse measurements without modifying existing modules (`changes/pulse-auto-instrumentation/`):
+  - **EventTopics**: 8 canonical constants (`ENGINE_STARTED`, `ENGINE_STOPPING`, `MODULE_STARTED`, `MODULE_STOPPED`, `MODULE_FAILED`, `TOOL_INVOCATION`, `TOOL_COMPLETED`, `TOOL_ERROR`) replacing free strings
+  - **SystemEvent**: Frozen dataclass (`event_id`, `topic`, `source`, `timestamp`, `payload`) for structured event representation
+  - **EventBus → Context**: `EventBus` is passed to every module via `Context.event_bus` during engine startup, NOT via ServiceRegistry
+  - **PulseEventSubscriber**: Standalone class that subscribes to EventBus topics and records measurements via PulseModule, with handler registry dict pattern (no if/elif chains)
+  - **Auto-emission in all 7 tools**: Coordinator tools (`status`, `health`, `history`, `recommend`, `progress`, `insights`, `logs`) automatically emit `TOOL_INVOCATION`, `TOOL_COMPLETED`, `TOOL_ERROR` via `_auto_emit_tool_events` decorator
+  - **Engine lifecycle events**: Engine emits `MODULE_STARTED`, `MODULE_STOPPED`, `MODULE_FAILED` automatically after `start_all()` / `stop_all()`
+  - **Auto-exclusion**: Events from `source="pulse"` are skipped (feedback loop prevention)
+  - **Backward compatibility**: Zero existing modules modified to emit events; all tests pass unchanged
   - ADR-008 documents all architecture decisions
   - 71 new tests (unit + integration)
 
