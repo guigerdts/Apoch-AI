@@ -282,8 +282,6 @@ class RecommendationEngine:
         degradation_notes: list[str] = []
 
         for module_name, diag in health.items():
-            if not isinstance(diag, dict):
-                continue
             diagnostic = diag.get("diagnostic", str(diag))
             # Degrade confidence by 0.9x for each failing module
             confidence *= 0.9

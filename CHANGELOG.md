@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.9.3-alpha] — 2026-07-18
+
+### Removed
+
+- **Dead Code Removal (PR-2)** — Removed unreachable `isinstance(diag, dict): continue` guard from `RecommendationEngine._apply_health()` in `src/apoch/modules/oracle/engine.py`. This condition could never be False because every value in the health dict is always a dict from Guardian diagnostics. Zero behavioral change, zero API/contract impact, no regressions.
+
 ## [0.9.2-alpha] — 2026-07-18
 
 ### Added
